@@ -12,6 +12,7 @@
 #include "bm1397.h"
 #include "serial.h"
 #include "utils.h"
+#include "bittools/hex.h"
 
 #define ECHO_TEST_TXD   (17)
 #define ECHO_TEST_RXD   (18)

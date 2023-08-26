@@ -9,8 +9,10 @@
 #include "esp_log.h"
 
 #include "serial.h"
+#include "bittools/flippers.h"
 #include "bm1397.h"
 #include "utils.h"
+#include "bmutils.h"
 #include "crc.h"
 #include "mining.h"
 #include "global_state.h"
@@ -293,7 +295,7 @@ void BM1397_set_job_difficulty_mask(int difficulty){
     // The mask must be a power of 2 so there are no holes
     // Correct:  {0b00000000, 0b00000000, 0b11111111, 0b11111111}
     // Incorrect: {0b00000000, 0b00000000, 0b11100111, 0b11111111}
-    difficulty = _largest_power_of_two(difficulty) -1; // (difficulty - 1) if it is a pow 2 then step down to second largest for more hashrate sampling
+    difficulty = largest_power_of_two(difficulty) -1; // (difficulty - 1) if it is a pow 2 then step down to second largest for more hashrate sampling
 
     // convert difficulty into char array
     // Ex: 256 = {0b00000000, 0b00000000, 0b00000000, 0b11111111}, {0x00, 0x00, 0x00, 0xff}
@@ -304,7 +306,7 @@ void BM1397_set_job_difficulty_mask(int difficulty){
         //So a mask of 512 looks like 0b00000000 00000000 00000001 1111111
         //and not 0b00000000 00000000 10000000 1111111
 
-        job_difficulty_mask[5 - i] = _reverse_bits(value);
+        job_difficulty_mask[5 - i] = reverse_bits(value);
     }
 
     ESP_LOGI(TAG, "Setting job ASIC mask to %d", difficulty);
@@ -352,7 +354,7 @@ void BM1397_send_work(void *pvParameters, bm_job *next_bm_job) {
         //ESP_LOGI(TAG, "Added Job: %i", job.job_id);
         pthread_mutex_unlock(&GLOBAL_STATE->valid_jobs_lock);
 
-        _send_BM1397((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), &job, sizeof(job_packet), false);
+        _send_BM1397((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *) &job, sizeof(job_packet), false);
 }
 
 

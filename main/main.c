@@ -4,7 +4,7 @@
 #include "nvs_flash.h"
 
 //#include "protocol_examples_common.h"
-#include "miner.h"
+#include "main.h"
 
 
 #include "stratum_task.h"
@@ -14,9 +14,13 @@
 #include "serial.h"
 #include "asic_result_task.h"
 #include "nvs_config.h"
+#include "http_server.h"
+#include "esp_netif.h"
+#include "user_input_task.h"
+
+
 
 #define ASIC_MODEL CONFIG_ASIC_MODEL
-
 
 
 static GlobalState GLOBAL_STATE = {
@@ -64,9 +68,6 @@ void app_main(void)
         exit(EXIT_FAILURE);
     }
 
-
-
-
     ESP_LOGI(TAG, "Welcome to the bitaxe!");
     //wait between 0 and 5 seconds for multiple units
     vTaskDelay(rand() % 5001 / portTICK_PERIOD_MS);
@@ -84,7 +85,7 @@ void app_main(void)
     strncpy(GLOBAL_STATE.SYSTEM_MODULE.ssid, wifi_ssid, 20);
 
     //init and connect to wifi
-    EventBits_t result_bits = wifi_init_sta(wifi_ssid, wifi_pass);
+    EventBits_t result_bits = wifi_init(wifi_ssid, wifi_pass);
 
     if (result_bits & WIFI_CONNECTED_BIT) {
         ESP_LOGI(TAG, "Connected to SSID: %s", wifi_ssid);
@@ -117,6 +118,10 @@ void app_main(void)
     xTaskCreate(POWER_MANAGEMENT_task, "power mangement", 8192, (void*)&GLOBAL_STATE, 10, NULL);
     xTaskCreate(ASIC_task, "asic", 8192, (void*)&GLOBAL_STATE, 10, NULL);
     xTaskCreate(ASIC_result_task, "asic result", 8192, (void*)&GLOBAL_STATE, 15, NULL);
+    xTaskCreate(USER_INPUT_task, "user input", 8192, (void*)&GLOBAL_STATE, 5, NULL);
+
+    start_rest_server((void*)&GLOBAL_STATE);
+
 
 }
 
@@ -129,4 +134,3 @@ void MINER_set_wifi_status(wifi_status_t status, uint16_t retry_count) {
         return;
     }
 }
-

@@ -54,6 +54,7 @@ void POWER_MANAGEMENT_task(void * pvParameters){
         power_management->fan_speed = EMC2101_get_fan_speed();
 
         if(strcmp(ASIC_MODEL, "BM1397") == 0){
+
             power_management->chip_temp = EMC2101_get_chip_temp();
 
             // Voltage

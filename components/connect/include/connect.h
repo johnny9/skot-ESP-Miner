@@ -27,4 +27,5 @@ typedef enum {
     WIFI_RETRYING,
 } wifi_status_t;
 
-EventBits_t wifi_init_sta(const char * ssid, const char * pass);
+void toggle_wifi_softap(void);
+EventBits_t wifi_init(const char * ssid, const char * pass);

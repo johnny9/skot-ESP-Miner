@@ -2,12 +2,10 @@ idf_component_register(
 SRCS 
     "bm1366.c"
     "bm1397.c" 
-    "serial.c"  
     "crc.c"
 INCLUDE_DIRS 
     "include"
-REQUIRES 
-    freertos 
+REQUIRES
     driver 
     stratum
 )

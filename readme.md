@@ -46,7 +46,7 @@ The esp-miner UI is called AxeOS and provides an API to expose actions and infor
 For more details take a look at `main/http_server/http_server.c`.
 
 Things that can be done are:
-  
+
   - Get System Info
   - Get Swarm Info
   - Update Swarm
@@ -91,6 +91,16 @@ In order to unlock the Input fields for ASIC Frequency and ASIC Core Voltage you
 - Install the ESP-IDF toolchain from https://docs.espressif.com/projects/esp-idf/en/stable/esp32/get-started/
 - Install nodejs/npm from https://nodejs.org/en/download
 - (Optional) Install the ESP-IDF extension for VSCode from https://marketplace.visualstudio.com/items?itemName=espressif.esp-idf-extension
+
+### Cloning the latest released version
+
+The master branch is regularly built and tested, but it is not guaranteed to be completely stable. Tags are created regularly from release branches to indicate new official, stable release versions of ESP-miner. We recommend building from the latest release tag.
+
+```
+git clone https://github.com/bitaxeorg/ESP-Miner.git --branch v2.8.0
+cd ESP-miner
+
+```
 
 ### Building
 

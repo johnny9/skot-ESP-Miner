@@ -71,10 +71,20 @@ def main():
     parser.add_argument("build_cmd", nargs=argparse.REMAINDER, help="Build command to run (default: idf.py build)")
     parser.add_argument("--image", help="Container image to use",
                     default="ghcr.io/bitaxeorg/esp-miner/devcontainer:sha-6a7c499a5dd8f985a578a05e04eba3fa9f93f1f7")
+    # Determine repository root to use as default workspace. Try git, fallback to script parent directory.
+    script_dir = os.path.abspath(os.path.dirname(__file__))
+    try:
+        repo_root = (
+            subprocess.check_output(["git", "rev-parse", "--show-toplevel"], cwd=script_dir, text=True)
+            .strip()
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        repo_root = os.path.abspath(os.path.join(script_dir, os.pardir))
+
     parser.add_argument(
         "--workspace",
-        help="Path to project root mounted inside container (default: current dir)",
-        default=os.getcwd(),
+        help="Path to project root mounted inside container (default: repository root)",
+        default=repo_root,
     )
 
     args = parser.parse_args()

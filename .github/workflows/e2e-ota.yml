@@ -24,12 +24,14 @@ jobs:
         with:
           name: esp-miner.bin
           path: artifacts
+          run-id: ${{ github.event.workflow_run.id }}
 
       - name: Download www.bin artifact
         uses: actions/download-artifact@v4
         with:
           name: www.bin
           path: artifacts
+          run-id: ${{ github.event.workflow_run.id }}
 
       - name: Set up Python
         uses: actions/setup-python@v5

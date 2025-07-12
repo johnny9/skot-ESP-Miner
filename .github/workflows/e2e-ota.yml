@@ -26,18 +26,18 @@ jobs:
     runs-on: 102
 
     steps:
-      - name: Download esp-miner.bin artifact
-        uses: actions/download-artifact@v4
-        with:
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Download www.bin artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: www.bin
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download and Extract Artifacts
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+        run: |
+           mkdir -p artifacts && cd artifacts
+           artifacts_url=${{ github.event.workflow_run.artifacts_url }}
+           gh api "$artifacts_url" -q '.artifacts[] | [.name, .archive_download_url] | @tsv' | while read artifact
+           do
+             IFS=$'\t' read name url <<< "$artifact"
+             gh api $url > "$name.zip"
+             unzip -d "$name" "$name.zip"
+           done
 
       - name: Set up Python
         uses: actions/setup-python@v5

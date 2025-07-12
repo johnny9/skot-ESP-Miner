@@ -12,6 +12,10 @@ on:
     types:
       - completed
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   ota_e2e_test:
     permissions:

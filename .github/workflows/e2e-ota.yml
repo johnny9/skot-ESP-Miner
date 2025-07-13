@@ -36,14 +36,17 @@ jobs:
            do
              IFS=$'\t' read name url <<< "$artifact"
              gh api $url > "$name.zip"
-             unzip -d "$name" "$name.zip"
+             unzip -o -d "$name" "$name.zip"
            done
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-          cache: pip
+      - name: Remove old venv (if any)
+        run: rm -rf .venv
+
+      - name: Create & activate virtualenv
+        run: |
+           python -m venv .venv
+           source .venv/bin/activate
+           pip install --upgrade pip
 
       - name: Install esp-miner-e2e test runner from GitHub
         run: |

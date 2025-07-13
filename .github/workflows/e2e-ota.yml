@@ -44,7 +44,7 @@ jobs:
           python -m venv .venv
           source .venv/bin/activate
           pip install --upgrade pip
-          pip install git+https://github.com/johnny9/esp-miner-e2e
+          pip install --force-reinstall --no-cache-dir git+https://github.com/johnny9/esp-miner-e2e
           esp-miner-e2e run test_ota_update \
             --fw-bin artifacts/esp-miner.bin/esp-miner.bin \
             --www-bin artifacts/www.bin/www.bin

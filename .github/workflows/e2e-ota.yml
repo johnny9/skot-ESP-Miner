@@ -39,21 +39,12 @@ jobs:
              unzip -o -d "$name" "$name.zip"
            done
 
-      - name: Remove old venv (if any)
-        run: rm -rf .venv
-
-      - name: Create & activate virtualenv
-        run: |
-           python -m venv .venv
-           source .venv/bin/activate
-           pip install --upgrade pip
-
-      - name: Install esp-miner-e2e test runner from GitHub
-        run: |
-          pip install git+https://github.com/johnny9/esp-miner-e2e
-
       - name: Run OTA update E2E tests
         run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install git+https://github.com/johnny9/esp-miner-e2e
           esp-miner-e2e run test_ota_update \
-            --fw-bin artifacts/esp-miner.bin \
-            --www-bin artifacts/www.bin
+            --fw-bin artifacts/esp-miner.bin/esp-miner.bin \
+            --www-bin artifacts/www.bin/www.bin

@@ -57,7 +57,9 @@ TEST_CASE("ASIC simulator rejects a full result queue", "[asic_simulator]")
 {
     task_result result = {0};
     asic_simulator_reset();
+    ASIC_set_backend(asic_simulator_backend());
 
+    TEST_ASSERT_EQUAL_UINT8(0, ASIC_init(NULL));
     TEST_ASSERT_FALSE(asic_simulator_queue_result(NULL));
     for (size_t i = 0; i < ASIC_SIMULATOR_RESULT_CAPACITY; i++) {
         result.job_id = (uint8_t)i;
@@ -65,7 +67,6 @@ TEST_CASE("ASIC simulator rejects a full result queue", "[asic_simulator]")
     }
     TEST_ASSERT_FALSE(asic_simulator_queue_result(&result));
 
-    ASIC_set_backend(asic_simulator_backend());
     for (size_t i = 0; i < ASIC_SIMULATOR_RESULT_CAPACITY; i++) {
         task_result *actual = ASIC_process_work(NULL);
         TEST_ASSERT_NOT_NULL(actual);

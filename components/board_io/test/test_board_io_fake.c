@@ -20,9 +20,11 @@ TEST_CASE("Board I/O fake supplies measurements and records output", "[board_io]
         .fan_speed = 4200,
         .fan_speed_2 = 4100,
     };
+    board_io_fake_errors_t no_errors = {0};
 
     board_io_fake_reset();
     board_io_fake_set_values(&values);
+    board_io_fake_set_errors(&no_errors);
     board_io_set_backend(board_io_fake_backend());
 
     TEST_ASSERT_EQUAL(ESP_OK, board_io_display_init(state));
@@ -60,20 +62,9 @@ TEST_CASE("Board I/O fake supplies measurements and records output", "[board_io]
     board_io_reset_backend();
 }
 
-TEST_CASE("Board I/O fake injects device errors", "[board_io]")
+TEST_CASE("Board I/O fake defaults to safe failures", "[board_io]")
 {
-    board_io_fake_errors_t errors = {
-        .display_init = ESP_FAIL,
-        .display_set_enabled = ESP_FAIL,
-        .vcore_init = ESP_FAIL,
-        .vcore_set_voltage = ESP_FAIL,
-        .vcore_check_fault = ESP_FAIL,
-        .thermal_init = ESP_FAIL,
-        .fan_set_percent = ESP_FAIL,
-    };
-
     board_io_fake_reset();
-    board_io_fake_set_errors(&errors);
     board_io_set_backend(board_io_fake_backend());
 
     TEST_ASSERT_EQUAL(ESP_FAIL, board_io_display_init(NULL));

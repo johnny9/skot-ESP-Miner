@@ -14,7 +14,6 @@ typedef struct {
 static pthread_mutex_t simulator_lock = PTHREAD_MUTEX_INITIALIZER;
 static simulator_state_t simulator = {
     .snapshot = {
-        .chip_count = 1,
         .baud_rate = 115200,
         .job_frequency_ms = 500.0,
     },
@@ -126,7 +125,6 @@ void asic_simulator_reset(void)
 {
     pthread_mutex_lock(&simulator_lock);
     memset(&simulator, 0, sizeof(simulator));
-    simulator.snapshot.chip_count = 1;
     simulator.snapshot.baud_rate = 115200;
     simulator.snapshot.job_frequency_ms = 500.0;
     pthread_mutex_unlock(&simulator_lock);

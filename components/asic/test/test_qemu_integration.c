@@ -72,10 +72,13 @@ TEST_CASE("QEMU runs simulated devices across FreeRTOS tasks", "[qemu-integratio
         .chip_temp = 55.0f,
         .fan_speed = 4200,
     };
+    board_io_fake_errors_t no_errors = {0};
     board_io_fake_reset();
     board_io_fake_set_values(&values);
+    board_io_fake_set_errors(&no_errors);
     board_io_set_backend(board_io_fake_backend());
     asic_simulator_reset();
+    asic_simulator_configure(1, 115200, 500.0);
     ASIC_set_backend(asic_simulator_backend());
 
     TEST_ASSERT_EQUAL(pdPASS, xTaskCreate(simulated_result_task, "sim result", 4096, &context, 4, NULL));

@@ -181,6 +181,13 @@ void board_io_fake_reset(void)
 {
     pthread_mutex_lock(&fake_lock);
     memset(&fake, 0, sizeof(fake));
+    fake.errors.display_init = ESP_FAIL;
+    fake.errors.display_set_enabled = ESP_FAIL;
+    fake.errors.vcore_init = ESP_FAIL;
+    fake.errors.vcore_set_voltage = ESP_FAIL;
+    fake.errors.vcore_check_fault = ESP_FAIL;
+    fake.errors.thermal_init = ESP_FAIL;
+    fake.errors.fan_set_percent = ESP_FAIL;
     pthread_mutex_unlock(&fake_lock);
 }
 

@@ -1,6 +1,7 @@
 #include "host_test_compat.h"
 #include "unity.h"
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

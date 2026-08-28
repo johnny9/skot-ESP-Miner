@@ -9,7 +9,7 @@ The revisions match ESP-IDF 6.0.2 for Unity, cJSON 1.7.19, and the mbedTLS
 
 ```sh
 cmake -S host-tests -B build/host -DCMAKE_BUILD_TYPE=Debug
-cmake --build build/host
+cmake --build build/host --target esp_miner_host_tests
 ctest --test-dir build/host --output-on-failure
 ```
 
@@ -18,7 +18,7 @@ Enable AddressSanitizer and UndefinedBehaviorSanitizer with:
 ```sh
 cmake -S host-tests -B build/host-sanitize \
   -DCMAKE_BUILD_TYPE=Debug -DESP_MINER_ENABLE_SANITIZERS=ON
-cmake --build build/host-sanitize
+cmake --build build/host-sanitize --target esp_miner_host_tests
 ctest --test-dir build/host-sanitize --output-on-failure
 ```
 

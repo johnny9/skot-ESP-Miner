@@ -3,9 +3,7 @@
 #include "freertos/task.h"
 #include "global_state.h"
 #include "nvs_config.h"
-#include "vcore.h"
-#include "thermal.h"
-#include "power.h"
+#include "board_io.h"
 #include "asic.h"
 #include "utils.h"
 #include "asic_init.h"
@@ -42,7 +40,7 @@ static void mining_stop(GlobalState * GLOBAL_STATE)
     ASIC_set_nonce_space(GLOBAL_STATE);
 
     // Cut ASIC power and hold in reset
-    VCORE_set_voltage(GLOBAL_STATE, 0.0f);
+    board_io_vcore_set_voltage(GLOBAL_STATE, 0.0f);
     asic_hold_reset_low();
 
     // Mark uninitialized immediately so tasks stop issuing UART commands
@@ -64,7 +62,7 @@ static uint8_t mining_start(GlobalState * GLOBAL_STATE)
 
     // Restore voltage from NVS
     uint16_t voltage = nvs_config_get_u16(NVS_CONFIG_ASIC_VOLTAGE);
-    VCORE_set_voltage(GLOBAL_STATE, (double) voltage / 1000.0);
+    board_io_vcore_set_voltage(GLOBAL_STATE, (double) voltage / 1000.0);
 
     // Wait for voltage to stabilize before touching the ASIC
     vTaskDelay(500 / portTICK_PERIOD_MS);
@@ -132,14 +130,14 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             return;
         }
 
-        power_management->voltage = Power_get_input_voltage(GLOBAL_STATE);
-        Power_get_output(GLOBAL_STATE, &power_management->power, &power_management->current);
-        power_management->core_voltage = VCORE_get_voltage_mv(GLOBAL_STATE);
+        power_management->voltage = board_io_power_get_input_voltage(GLOBAL_STATE);
+        board_io_power_get_output(GLOBAL_STATE, &power_management->power, &power_management->current);
+        power_management->core_voltage = board_io_vcore_get_voltage_mv(GLOBAL_STATE);
 
-        power_management->chip_temp_avg = Thermal_get_chip_temp(GLOBAL_STATE);
-        power_management->chip_temp2_avg = Thermal_get_chip_temp2(GLOBAL_STATE);
+        power_management->chip_temp_avg = board_io_thermal_get_chip_temp(GLOBAL_STATE);
+        power_management->chip_temp2_avg = board_io_thermal_get_chip_temp_2(GLOBAL_STATE);
 
-        power_management->vr_temp = Power_get_vreg_temp(GLOBAL_STATE);
+        power_management->vr_temp = board_io_power_get_vreg_temp(GLOBAL_STATE);
         // User pause, hardware fault, or all pools unreachable
         bool wants_stop = sys_module->mining_paused || sys_module->hardware_fault || sys_module->pools_unavailable;
         if (wants_stop && !is_paused) {
@@ -186,12 +184,12 @@ void POWER_MANAGEMENT_task(void * pvParameters)
                 vTaskDelay(5000 / portTICK_PERIOD_MS); // Wait 5 seconds
                 cooling_cycles++;
                 
-                power_management->vr_temp = Power_get_vreg_temp(GLOBAL_STATE);
+                power_management->vr_temp = board_io_power_get_vreg_temp(GLOBAL_STATE);
                 
                 // Only check ASIC temps if they're valid (not using ASIC thermal diode)
                 if (asic_temp_valid) {
-                    power_management->chip_temp_avg = Thermal_get_chip_temp(GLOBAL_STATE);
-                    power_management->chip_temp2_avg = Thermal_get_chip_temp2(GLOBAL_STATE);
+                    power_management->chip_temp_avg = board_io_thermal_get_chip_temp(GLOBAL_STATE);
+                    power_management->chip_temp2_avg = board_io_thermal_get_chip_temp_2(GLOBAL_STATE);
                     ESP_LOGW(TAG, "Safe mode active (cycle %d) - VR: %.1f°C ASIC1: %.1f°C ASIC2: %.1f°C",
                              cooling_cycles, power_management->vr_temp, power_management->chip_temp_avg, power_management->chip_temp2_avg);
                     
@@ -234,7 +232,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
 
         if (core_voltage != last_core_voltage) {
             ESP_LOGI(TAG, "setting new vcore voltage to %umV", core_voltage);
-            VCORE_set_voltage(GLOBAL_STATE, (double) core_voltage / 1000.0);
+            board_io_vcore_set_voltage(GLOBAL_STATE, (double) core_voltage / 1000.0);
             last_core_voltage = core_voltage;
         }
 
@@ -258,7 +256,7 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             ESP_LOGI(TAG, "Overheat mode updated to: %d", sys_module->overheat_mode);
         }
 
-        VCORE_check_fault(GLOBAL_STATE);
+        board_io_vcore_check_fault(GLOBAL_STATE);
 
         // looper:
         vTaskDelay(POLL_RATE / portTICK_PERIOD_MS);

@@ -6,7 +6,7 @@
 #include "global_state.h"
 #include "fan_controller_task.h"
 #include "nvs_config.h"
-#include "thermal.h"
+#include "board_io.h"
 #include "PID.h"
 
 #define EPSILON 0.0001f
@@ -36,7 +36,7 @@ static void update_fan_speed(GlobalState * GLOBAL_STATE, float target_perc, cons
     }
     if (target_changed) {
         GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc = target_perc;
-        if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, target_perc / 100.0f) != ESP_OK) {
+        if (board_io_fan_set_percent(&GLOBAL_STATE->DEVICE_CONFIG, target_perc / 100.0f) != ESP_OK) {
             ESP_LOGE(TAG, "FATAL: Fan Control Failed (%s). Flagging hardware fault.", context);
             GLOBAL_STATE->SYSTEM_MODULE.hardware_fault = true;
             snprintf(GLOBAL_STATE->SYSTEM_MODULE.hardware_fault_msg, sizeof(GLOBAL_STATE->SYSTEM_MODULE.hardware_fault_msg), "Fan Control Failed (%s)", context);
@@ -131,8 +131,8 @@ void FAN_CONTROLLER_task(void * pvParameters)
             }
         }
 
-        power_management->fan_rpm = Thermal_get_fan_speed(&GLOBAL_STATE->DEVICE_CONFIG);
-        power_management->fan2_rpm = Thermal_get_fan2_speed(&GLOBAL_STATE->DEVICE_CONFIG);
+        power_management->fan_rpm = board_io_fan_get_speed(&GLOBAL_STATE->DEVICE_CONFIG);
+        power_management->fan2_rpm = board_io_fan_get_speed_2(&GLOBAL_STATE->DEVICE_CONFIG);
 
         vTaskDelayUntil(&taskWakeTime, POLL_TIME_MS / portTICK_PERIOD_MS);
     }

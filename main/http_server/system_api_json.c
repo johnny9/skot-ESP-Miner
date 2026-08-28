@@ -12,7 +12,7 @@
 #include "system.h"
 #include "nvs_config.h"
 #include "sv2_protocol.h"
-#include "vcore.h"
+#include "board_io.h"
 #include "connect.h"
 #include "hashrate_monitor_task.h"
 #include "cjson_utils.h"
@@ -114,7 +114,7 @@ static void system_api_add_telemetry(cJSON *root, GlobalState *g) {
 
     // Faults
     if (g->SYSTEM_MODULE.power_fault > 0) {
-        cJSON_AddStringToObject(root, "power_fault", VCORE_get_fault_string(g));
+        cJSON_AddStringToObject(root, "power_fault", board_io_vcore_get_fault_string(g));
     }
     if (g->SYSTEM_MODULE.hardware_fault) {
         cJSON_AddStringToObject(root, "hardware_fault", g->SYSTEM_MODULE.hardware_fault_msg);

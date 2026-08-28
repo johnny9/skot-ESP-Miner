@@ -7,7 +7,7 @@
 #include "global_state.h"
 #include "screen.h"
 #include "nvs_config.h"
-#include "display.h"
+#include "board_io.h"
 #include "connect.h"
 #include "esp_timer.h"
 
@@ -445,7 +445,7 @@ static void screen_update_cb(lv_timer_t * timer)
         }
     }
 
-    display_on(enable_display);
+    board_io_display_set_enabled(enable_display);
 
     if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) {
         SelfTestModule * self_test = &GLOBAL_STATE->SELF_TEST_MODULE;

@@ -8,9 +8,7 @@
 #include "esp_check.h"
 
 #include "DS4432U.h"
-#include "thermal.h"
-#include "vcore.h"
-#include "power.h"
+#include "board_io.h"
 #include "nvs_config.h"
 #include "global_state.h"
 #include "asic_reset.h"
@@ -179,7 +177,7 @@ static void self_test_set_fan_percent(GlobalState * GLOBAL_STATE, float fan_perc
     if (fan_percent < 0.0f) fan_percent = 0.0f;
 
     GLOBAL_STATE->POWER_MANAGEMENT_MODULE.fan_perc = fan_percent;
-    if (Thermal_set_fan_percent(&GLOBAL_STATE->DEVICE_CONFIG, fan_percent / 100.0f) != ESP_OK) {
+    if (board_io_fan_set_percent(&GLOBAL_STATE->DEVICE_CONFIG, fan_percent / 100.0f) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to set fan speed to %.1f%%", fan_percent);
         self_test_show_message(GLOBAL_STATE, "FAN:FAIL");
         tests_done(GLOBAL_STATE, false);
@@ -193,8 +191,8 @@ static bool self_test_temp_invalid(float temp)
 
 static float self_test_get_control_temp(GlobalState * GLOBAL_STATE)
 {
-    float temp = Thermal_get_chip_temp(GLOBAL_STATE);
-    float temp2 = Thermal_get_chip_temp2(GLOBAL_STATE);
+    float temp = board_io_thermal_get_chip_temp(GLOBAL_STATE);
+    float temp2 = board_io_thermal_get_chip_temp_2(GLOBAL_STATE);
 
     if (self_test_temp_invalid(temp)) {
         return temp2;
@@ -339,7 +337,7 @@ void self_test_show_message(GlobalState * GLOBAL_STATE, const char * msg)
 
 static esp_err_t test_fan_sense(GlobalState * GLOBAL_STATE)
 {
-    uint16_t fan_speed = Thermal_get_fan_speed(&GLOBAL_STATE->DEVICE_CONFIG);
+    uint16_t fan_speed = board_io_fan_get_speed(&GLOBAL_STATE->DEVICE_CONFIG);
     uint16_t target_speed = nvs_config_get_u16(NVS_CONFIG_SELF_TEST_FAN_SPEED);
 
     ESP_LOGI(TAG, "fanSpeed: %d RPM", fan_speed);
@@ -364,7 +362,7 @@ static esp_err_t test_power_consumption(GlobalState * GLOBAL_STATE)
     float power = 0;
     float current = 0;
     
-    Power_get_output(GLOBAL_STATE, &power, &current);
+    board_io_power_get_output(GLOBAL_STATE, &power, &current);
     ESP_LOGI(TAG, "Power: %.2f W", power);
 
     if (power <= target_power + margin) {
@@ -378,7 +376,7 @@ static esp_err_t test_power_consumption(GlobalState * GLOBAL_STATE)
 
 static esp_err_t test_core_voltage(GlobalState * GLOBAL_STATE)
 {
-    uint16_t core_voltage = VCORE_get_voltage_mv(GLOBAL_STATE);
+    uint16_t core_voltage = board_io_vcore_get_voltage_mv(GLOBAL_STATE);
     uint16_t target_voltage = GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_voltage_mv;
     float margin = target_voltage * SELF_TEST_CORE_VOLTAGE_TOLERANCE;
     ESP_LOGI(TAG, "Core voltage: %u mV (target: %u mV +/- %.0f mV)", core_voltage, target_voltage, margin);
@@ -398,7 +396,7 @@ static esp_err_t test_input_voltage(GlobalState * GLOBAL_STATE)
         return ESP_OK;
     }
 
-    float input_voltage_mv = Power_get_input_voltage(GLOBAL_STATE);
+    float input_voltage_mv = board_io_power_get_input_voltage(GLOBAL_STATE);
     float nominal_mv = GLOBAL_STATE->DEVICE_CONFIG.family.nominal_voltage * 1000.0f;
     float margin_mv = nominal_mv * INPUT_VOLTAGE_MARGIN;
 
@@ -416,7 +414,7 @@ static esp_err_t test_input_voltage(GlobalState * GLOBAL_STATE)
 esp_err_t test_vreg_faults(GlobalState * GLOBAL_STATE)
 {
     // check for faults on the voltage regulator
-    ESP_RETURN_ON_ERROR(VCORE_check_fault(GLOBAL_STATE), TAG, "VCORE check fault failed!");
+    ESP_RETURN_ON_ERROR(board_io_vcore_check_fault(GLOBAL_STATE), TAG, "VCORE check fault failed!");
 
     if (GLOBAL_STATE->SYSTEM_MODULE.power_fault) {
         return ESP_FAIL;
@@ -756,7 +754,7 @@ static void tests_done(GlobalState * GLOBAL_STATE, bool isTestPassed)
 {
     GLOBAL_STATE->SELF_TEST_MODULE.is_finished = true;
     self_test_stop_nonce_measurement(GLOBAL_STATE);
-    VCORE_set_voltage(GLOBAL_STATE, 0.0f);
+    board_io_vcore_set_voltage(GLOBAL_STATE, 0.0f);
     asic_hold_reset_low();
 
     if (isTestPassed) {

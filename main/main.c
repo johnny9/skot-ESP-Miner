@@ -29,6 +29,8 @@
 #include "filesystem.h"
 #include "log_buffer.h"
 #include "setup_ble.h"
+#include "board_io.h"
+#include "board_io_hardware.h"
 #include "esp_ota_ops.h"
 
 static GlobalState GLOBAL_STATE;
@@ -58,6 +60,8 @@ static void cjson_free_psram(void *ptr)
 
 void app_main(void)
 {
+    board_io_set_backend(board_io_hardware_backend());
+
     ESP_ERROR_CHECK(heap_caps_register_failed_alloc_callback(heap_alloc_failed_hook));
 
     cJSON_Hooks hooks = {

@@ -3,6 +3,7 @@ SRCS
     "adc.c"
     "i2c_bitaxe.c"
     "main.c"
+    "board_io_hardware.c"
     "log_buffer.c"
     "nvs_config.c"
     "display.c"
@@ -68,6 +69,7 @@ INCLUDE_DIRS
 
 REQUIRES
     "asic"
+    "board_io"
     "connect"
     "dns_server"
     "stratum"

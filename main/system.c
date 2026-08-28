@@ -25,11 +25,9 @@
 #include "system.h"
 #include "connect.h"
 #include "nvs_config.h"
-#include "display.h"
+#include "board_io.h"
 #include "input.h"
 #include "screen.h"
-#include "vcore.h"
-#include "thermal.h"
 #include "utils.h"
 #include "self_test.h"
 #include "filesystem.h"
@@ -317,7 +315,7 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
         return ret;
     }
 
-    ret = display_init(GLOBAL_STATE);
+    ret = board_io_display_init(GLOBAL_STATE);
     if (ret != ESP_OK) {
         self_test_show_message(GLOBAL_STATE, "DISPLAY:FAIL");
         ESP_LOGE(TAG, "Display init failed");
@@ -364,7 +362,7 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
     }
 
     // Initialize the core voltage regulator
-    ret = VCORE_init(GLOBAL_STATE);
+    ret = board_io_vcore_init(GLOBAL_STATE);
     if (ret != ESP_OK) {
         self_test_show_message(GLOBAL_STATE, "VCORE:FAIL");
         ESP_LOGE(TAG, "VCORE init failed");
@@ -375,7 +373,7 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
     if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) {
         vTaskDelay(500 / portTICK_PERIOD_MS);
 
-        ret = VCORE_set_voltage(GLOBAL_STATE, (float)GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_voltage_mv / 1000.0f);
+        ret = board_io_vcore_set_voltage(GLOBAL_STATE, (float)GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_voltage_mv / 1000.0f);
         if (ret != ESP_OK) {
             self_test_show_message(GLOBAL_STATE, "VCORE:FAIL");
             ESP_LOGE(TAG, "VCORE set failed");
@@ -383,7 +381,7 @@ esp_err_t SYSTEM_init_peripherals(GlobalState * GLOBAL_STATE) {
         }
     }
 
-    ret = Thermal_init(&GLOBAL_STATE->DEVICE_CONFIG);
+    ret = board_io_thermal_init(&GLOBAL_STATE->DEVICE_CONFIG);
     if (ret != ESP_OK) {
         self_test_show_message(GLOBAL_STATE, "THERMAL:FAIL");
         ESP_LOGE(TAG, "Thermal init failed");

@@ -24,6 +24,9 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v6
 
+      - name: Check test ownership
+        run: python3 tools/test_inventory.py --check
+
       - name: Configure host tests
         env:
           CC: ${{ matrix.compiler }}

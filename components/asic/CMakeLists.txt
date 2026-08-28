@@ -10,6 +10,7 @@ SRCS
     "asic_common.c"
     "asic.c"
     "asic_backend.c"
+    "asic_simulator.c"
     "frequency_transition_bmXX.c"
     "pll.c"
 

@@ -57,6 +57,7 @@ add_executable(
     ../components/asic/test/test_pll.c
     ../components/asic/test/test_timeout.c
     ../components/asic/test/test_asic_backend.c
+    ../components/asic/test/test_asic_simulator.c
     ../components/stratum/stratum_api.c
     ../components/stratum/coinbase_decoder.c
     ../components/stratum/base58.c
@@ -67,6 +68,7 @@ add_executable(
     ../components/asic/pll.c
     ../components/asic/asic_common.c
     ../components/asic/asic_backend.c
+    ../components/asic/asic_simulator.c
     src/asic_bitmain_stub.c
 )
 

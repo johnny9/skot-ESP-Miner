@@ -6,9 +6,9 @@ static void print_banner(const char *text);
 
 void app_main(void)
 {
-    print_banner("Running all the registered tests");
+    print_banner("Running focused QEMU integration tests");
     UNITY_BEGIN();
-    unity_run_tests_by_tag("[not-on-qemu]", true);
+    unity_run_tests_by_tag("[qemu-integration]", false);
     UNITY_END();
 
     // print_banner("Starting interactive test menu");

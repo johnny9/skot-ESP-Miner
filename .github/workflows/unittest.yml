@@ -47,7 +47,8 @@ jobs:
           name: host-test-results-${{ matrix.compiler }}
           path: build/host/host-test-results.xml
 
-  build-and-test:
+  qemu-integration:
+    name: QEMU integration
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo

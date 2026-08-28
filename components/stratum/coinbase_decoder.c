@@ -303,7 +303,7 @@ esp_err_t coinbase_process_miner_job(const miner_job_t *job,
         if (offset >= coinbase_2_len) break;
         uint64_t script_len = coinbase_decode_varint(coinbase_2_bin, coinbase_2_len, &offset);
 
-        if (offset + script_len > coinbase_2_len) break;
+        if ((uint64_t)offset + script_len > (uint64_t)coinbase_2_len) break;
 
         if (decode_coinbase_tx) {
             if (value_satoshis > 0) {            

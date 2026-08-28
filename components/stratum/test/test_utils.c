@@ -17,7 +17,7 @@ TEST_CASE("Test hex2bin", "[utils]")
 {
     char *hex_string = "48454c4c4f";
     size_t bin_len = strlen(hex_string) / 2;
-    uint8_t *bin = malloc(bin_len);
+    uint8_t bin[5];
     hex2bin(hex_string, bin, bin_len);
     TEST_ASSERT_EQUAL(72, bin[0]);
     TEST_ASSERT_EQUAL(69, bin[1]);

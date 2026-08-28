@@ -121,6 +121,7 @@ bool my_dblsha256(void *hash, const void *data, size_t datasz)
 
 int b58check(const void *bin, size_t binsz, const char *base58str, size_t b58sz)
 {
+	(void)b58sz;
 	unsigned char buf[32];
 	const uint8_t *binc = bin;
 	unsigned i;

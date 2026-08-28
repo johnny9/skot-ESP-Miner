@@ -6,15 +6,19 @@
 
 #include "stratum_api.h"
 #include "cJSON.h"
+#ifndef ESP_MINER_PARSER_ONLY
 #include "esp_log.h"
 #include "esp_app_desc.h"
 #include "esp_transport.h"
 #include "esp_transport_ssl.h"
 #include "esp_transport_tcp.h"
 #include "esp_crt_bundle.h"
-#include "utils.h"
 #include "esp_timer.h"
 #include "esp_heap_caps.h"
+#else
+#include "esp_log.h"
+#endif
+#include "utils.h"
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
@@ -23,15 +27,17 @@
 #include <math.h>
 #include <time.h>
 
-#define TRANSPORT_TIMEOUT_MS 5000
-#define BUFFER_SIZE 1024
 #define MAX_EXTRANONCE_2_LEN 32
-#define MAX_JSON_RPC_BUFFER_SIZE (32 * 1024)
 #define MIN_POOL_DIFFICULTY 0.0001
 #define MAX_POOL_DIFFICULTY 4294967295.0
 #define BITCOIN_GENESIS_NTIME 1231006505
 #define MAX_ERROR_MSG_LEN 256
 static const char * TAG = "stratum_api";
+
+#ifndef ESP_MINER_PARSER_ONLY
+#define TRANSPORT_TIMEOUT_MS 5000
+#define BUFFER_SIZE 1024
+#define MAX_JSON_RPC_BUFFER_SIZE (32 * 1024)
 
 static char * json_rpc_buffer = NULL;
 static size_t json_rpc_buffer_size = 0;
@@ -226,6 +232,7 @@ char * STRATUM_V1_receive_jsonrpc_line(esp_transport_handle_t transport)
     }
     return line;
 }
+#endif
 
 void STRATUM_V1_reset_message(StratumApiV1Message *message)
 {
@@ -505,6 +512,7 @@ static bool parse_show_message(cJSON *json, StratumApiV1Message *message)
 
 static bool parse_get_version(cJSON *json, StratumApiV1Message *message)
 {
+    (void)json;
     if (message->version_string) free(message->version_string);
     message->version_string = strdup("unknown");
     ESP_LOGI(TAG, "Get version requested");
@@ -705,8 +713,7 @@ bool STRATUM_V1_parse(StratumApiV1Message *message, const char *stratum_json)
     return result;
 }
 
-
-
+#ifndef ESP_MINER_PARSER_ONLY
 static void stamp_tx(int request_id, uint64_t timestamp_us)
 {
     if (request_id >= 1) {
@@ -841,6 +848,7 @@ int STRATUM_V1_configure_version_rolling(esp_transport_handle_t transport, int s
 
     return esp_transport_write(transport, configure_msg, strlen(configure_msg), TRANSPORT_TIMEOUT_MS);
 }
+#endif
 
 stratum_protocol_t stratum_protocol_from_string(const char *s)
 {

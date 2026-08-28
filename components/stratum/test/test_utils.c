@@ -72,6 +72,23 @@ TEST_CASE("reverse_endianness_per_word", "[utils]")
     TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, data, 32);
 }
 
+TEST_CASE("word reversal accepts unaligned buffers", "[utils]")
+{
+    uint8_t source_storage[33];
+    uint8_t destination_storage[33] = {0};
+    uint8_t *source = source_storage + 1;
+    uint8_t *destination = destination_storage + 1;
+
+    for (int i = 0; i < 32; i++) source[i] = i;
+
+    reverse_32bit_words(source, destination);
+    reverse_endianness_per_word(destination);
+
+    uint8_t expected[32];
+    for (int i = 0; i < 32; i++) expected[i] = 31 - i;
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, destination, 32);
+}
+
 TEST_CASE("networkDifficulty", "[utils]")
 {
     uint32_t nBits = 0x1701cdfb;

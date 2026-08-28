@@ -9,6 +9,7 @@
 #include "bm1373.h"
 
 #include "asic.h"
+#include "asic_backend.h"
 #include "global_state.h"
 #include "mining.h"
 #include "device_config.h"
@@ -16,7 +17,7 @@
 
 static const char *TAG = "asic";
 
-uint8_t ASIC_init(GlobalState * GLOBAL_STATE)
+static uint8_t bitmain_init(GlobalState * GLOBAL_STATE)
 {
     ESP_LOGI(TAG, "Initializing %dx %s", GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
@@ -35,7 +36,7 @@ uint8_t ASIC_init(GlobalState * GLOBAL_STATE)
     return 0;
 }
 
-task_result * ASIC_process_work(GlobalState * GLOBAL_STATE)
+static task_result *bitmain_process_work(GlobalState * GLOBAL_STATE)
 {
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:
@@ -53,7 +54,7 @@ task_result * ASIC_process_work(GlobalState * GLOBAL_STATE)
     return NULL;
 }
 
-int ASIC_set_max_baud(GlobalState * GLOBAL_STATE)
+static int bitmain_set_max_baud(GlobalState * GLOBAL_STATE)
 {
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:
@@ -71,7 +72,7 @@ int ASIC_set_max_baud(GlobalState * GLOBAL_STATE)
     return 0;
 }
 
-void ASIC_send_work(GlobalState * GLOBAL_STATE, bm_job * next_job)
+static void bitmain_send_work(GlobalState * GLOBAL_STATE, bm_job * next_job)
 {
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:
@@ -95,7 +96,7 @@ void ASIC_send_work(GlobalState * GLOBAL_STATE, bm_job * next_job)
     }
 }
 
-void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask)
+static void bitmain_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask)
 {
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:
@@ -119,7 +120,7 @@ void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask)
     }
 }
 
-void ASIC_set_frequency(GlobalState * GLOBAL_STATE)
+static void bitmain_set_frequency(GlobalState * GLOBAL_STATE)
 {
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:
@@ -141,7 +142,7 @@ void ASIC_set_frequency(GlobalState * GLOBAL_STATE)
     ESP_LOGE(TAG, "Unknown ASIC id %d — cannot set frequency", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
 }
 
-void ASIC_set_nonce_space(GlobalState * GLOBAL_STATE)
+static void bitmain_set_nonce_space(GlobalState * GLOBAL_STATE)
 {
     float nonce_percent = 1.0;
     int cores = GLOBAL_STATE->DEVICE_CONFIG.family.asic.core_count;
@@ -167,7 +168,7 @@ void ASIC_set_nonce_space(GlobalState * GLOBAL_STATE)
     ESP_LOGE(TAG, "Unknown ASIC id %d — cannot set nonce space", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
 }
 
-double ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE)
+static double bitmain_get_job_frequency_ms(GlobalState * GLOBAL_STATE)
 {
     float freq = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
     int cores = GLOBAL_STATE->DEVICE_CONFIG.family.asic.core_count;
@@ -189,7 +190,7 @@ double ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE)
     return 500;
 }
 
-void ASIC_read_registers(GlobalState * GLOBAL_STATE)
+static void bitmain_read_registers(GlobalState * GLOBAL_STATE)
 {
     switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
         case BM1397:
@@ -211,4 +212,21 @@ void ASIC_read_registers(GlobalState * GLOBAL_STATE)
             ESP_LOGE(TAG, "Unknown ASIC id %d — cannot read registers", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
             break;
     }
+}
+
+static const asic_backend_t bitmain_backend = {
+    .init = bitmain_init,
+    .process_work = bitmain_process_work,
+    .set_max_baud = bitmain_set_max_baud,
+    .send_work = bitmain_send_work,
+    .set_version_mask = bitmain_set_version_mask,
+    .set_frequency = bitmain_set_frequency,
+    .set_nonce_space = bitmain_set_nonce_space,
+    .get_job_frequency_ms = bitmain_get_job_frequency_ms,
+    .read_registers = bitmain_read_registers,
+};
+
+const asic_backend_t *asic_bitmain_backend(void)
+{
+    return &bitmain_backend;
 }

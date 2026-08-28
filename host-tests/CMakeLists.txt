@@ -56,6 +56,7 @@ add_executable(
     ../components/stratum_v2/test/test_sv2.c
     ../components/asic/test/test_pll.c
     ../components/asic/test/test_timeout.c
+    ../components/asic/test/test_asic_backend.c
     ../components/stratum/stratum_api.c
     ../components/stratum/coinbase_decoder.c
     ../components/stratum/base58.c
@@ -65,6 +66,8 @@ add_executable(
     ../components/stratum_v2/sv2_protocol.c
     ../components/asic/pll.c
     ../components/asic/asic_common.c
+    ../components/asic/asic_backend.c
+    src/asic_bitmain_stub.c
 )
 
 target_compile_features(esp_miner_host_tests PRIVATE c_std_11)

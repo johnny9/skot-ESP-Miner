@@ -1,0 +1,9 @@
+idf_component_register(
+    SRCS
+        "board_io.c"
+        "board_io_fake.c"
+    INCLUDE_DIRS
+        "include"
+    REQUIRES
+        "pthread"
+)

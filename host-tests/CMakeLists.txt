@@ -4,6 +4,7 @@ project(esp_miner_host_tests LANGUAGES C)
 
 include(CTest)
 include(FetchContent)
+find_package(Threads REQUIRED)
 
 # cJSON 1.7.19 predates CMake 4 and declares an older policy baseline.
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
@@ -58,6 +59,7 @@ add_executable(
     ../components/asic/test/test_timeout.c
     ../components/asic/test/test_asic_backend.c
     ../components/asic/test/test_asic_simulator.c
+    ../components/board_io/test/test_board_io_fake.c
     ../components/stratum/stratum_api.c
     ../components/stratum/coinbase_decoder.c
     ../components/stratum/base58.c
@@ -69,6 +71,8 @@ add_executable(
     ../components/asic/asic_common.c
     ../components/asic/asic_backend.c
     ../components/asic/asic_simulator.c
+    ../components/board_io/board_io.c
+    ../components/board_io/board_io_fake.c
     src/asic_bitmain_stub.c
 )
 
@@ -99,9 +103,10 @@ target_include_directories(
         ../components/stratum/include
         ../components/stratum_v2/include
         ../components/asic/include
+        ../components/board_io/include
 )
 
-target_link_libraries(esp_miner_host_tests PRIVATE unity cjson TF-PSA-Crypto::tfpsacrypto m)
+target_link_libraries(esp_miner_host_tests PRIVATE unity cjson TF-PSA-Crypto::tfpsacrypto Threads::Threads m)
 
 if(ESP_MINER_ENABLE_SANITIZERS)
     target_compile_options(esp_miner_host_tests PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)

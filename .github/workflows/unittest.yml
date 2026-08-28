@@ -7,6 +7,46 @@ permissions:
   contents: read
 
 jobs:
+  host-test:
+    name: Host tests (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: GCC sanitizers
+            compiler: gcc
+            sanitizers: ON
+          - name: Clang
+            compiler: clang
+            sanitizers: OFF
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Configure host tests
+        env:
+          CC: ${{ matrix.compiler }}
+        run: >-
+          cmake -S host-tests -B build/host
+          -DCMAKE_BUILD_TYPE=Debug
+          -DESP_MINER_ENABLE_SANITIZERS=${{ matrix.sanitizers }}
+
+      - name: Build host tests
+        run: cmake --build build/host --target esp_miner_host_tests --parallel
+
+      - name: Run host tests
+        run: >-
+          ctest --test-dir build/host --output-on-failure
+          --output-junit host-test-results.xml
+
+      - name: Upload host test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: host-test-results-${{ matrix.compiler }}
+          path: build/host/host-test-results.xml
+
   build-and-test:
     runs-on: ubuntu-latest
     steps:

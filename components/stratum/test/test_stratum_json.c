@@ -1,5 +1,6 @@
 #include "unity.h"
-#include "stratum_api.h"
+#include "stratum_protocol.h"
+#include "sv1_protocol.h"
 #include <string.h>
 
 static StratumApiV1Message stratum_api_v1_message;

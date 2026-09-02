@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "unity.h"
 #include "coinbase_decoder.h"
@@ -271,6 +272,7 @@ TEST_CASE("BIP-110 signaling not detected", "[coinbase_decoder]")
     esp_err_t err = test_process_v1_job(c1, c2, 0x20000000, "01020304", 8, "", true, &result);
     TEST_ASSERT_EQUAL(ESP_OK, err);
     TEST_ASSERT_FALSE(result.bip110_signaling);
+    free(result.scriptsig);
 }
 
 TEST_CASE("BIP-110 signaling detected", "[coinbase_decoder]")
@@ -282,6 +284,7 @@ TEST_CASE("BIP-110 signaling detected", "[coinbase_decoder]")
     esp_err_t err = test_process_v1_job(c1, c2, 0x20000010, "01020304", 8, "", true, &result);
     TEST_ASSERT_EQUAL(ESP_OK, err);
     TEST_ASSERT_TRUE(result.bip110_signaling);
+    free(result.scriptsig);
 }
 
 TEST_CASE("BIP-110 signaling last block", "[coinbase_decoder]")
@@ -294,6 +297,7 @@ TEST_CASE("BIP-110 signaling last block", "[coinbase_decoder]")
     TEST_ASSERT_EQUAL(ESP_OK, err);
     TEST_ASSERT_EQUAL(965663, result.block_height);
     TEST_ASSERT_TRUE(result.bip110_signaling);
+    free(result.scriptsig);
 }
 
 TEST_CASE("BIP-110 signaling expired", "[coinbase_decoder]")
@@ -306,6 +310,7 @@ TEST_CASE("BIP-110 signaling expired", "[coinbase_decoder]")
     TEST_ASSERT_EQUAL(ESP_OK, err);
     TEST_ASSERT_EQUAL(965664, result.block_height);
     TEST_ASSERT_FALSE(result.bip110_signaling);
+    free(result.scriptsig);
 }
 
 TEST_CASE("Decode via miner_job_t directly", "[coinbase_decoder]")
@@ -338,4 +343,6 @@ TEST_CASE("Decode via miner_job_t directly", "[coinbase_decoder]")
     esp_err_t err_null = coinbase_process_miner_job(&job, NULL, true, &null_user_result);
     TEST_ASSERT_EQUAL(ESP_OK, err_null);
     TEST_ASSERT_EQUAL(965663, null_user_result.block_height);
+    free(result.scriptsig);
+    free(null_user_result.scriptsig);
 }

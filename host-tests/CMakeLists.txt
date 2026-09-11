@@ -76,6 +76,7 @@ add_executable(
     src/esp_log_host.c
     ${host_test_sources}
     ../components/stratum/test/job_pipeline_fixture.c
+    ../components/stratum/test/mining_allocator_fixture.c
     ../components/asic/test/bm13xx_fixture.c
     ../components/asic/bm1366.c
     ../components/asic/bm1368.c
@@ -111,6 +112,13 @@ set_source_files_properties(
     PROPERTIES
         COMPILE_OPTIONS
             "-include;${CMAKE_CURRENT_SOURCE_DIR}/../main/tasks/create_jobs_task.h"
+)
+
+# Interpose allocation only in the real job producer and coinbase builder.
+# The shared ESP-IDF fixtures use the same bindings with private symbols.
+set_property(SOURCE ../main/tasks/create_jobs_task.c ../components/stratum/mining.c
+    APPEND PROPERTY COMPILE_OPTIONS
+    "-include;${CMAKE_CURRENT_SOURCE_DIR}/../components/stratum/test/mining_fixture_bindings.h"
 )
 
 target_compile_features(esp_miner_host_tests PRIVATE c_std_11)

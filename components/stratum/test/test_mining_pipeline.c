@@ -527,3 +527,113 @@ TEST_CASE("job task fixture rejects oversized extranonce work",
     TEST_ASSERT_EQUAL_UINT32(1, result.coinbase_decode_count);
     job_pipeline_fixture_result_free(&result);
 }
+
+static miner_job_t *prepare_followup_job(uint8_t extranonce_len, bool large_coinbase)
+{
+    miner_job_pool_init();
+    miner_job_t *job = miner_job_get_slot(0);
+    (void)snprintf(job->job_id, sizeof(job->job_id), "followup");
+    job->type = JOB_TYPE_V1;
+    job->version = 0x20000004;
+    job->version_mask = 0x1fffe000;
+    job->clean_jobs = true;
+    job->ntime = 0x64658bd8;
+    job->nbits = 0x1705dd01;
+    job->pool_diff = 256.0;
+    job->extranonce2_len = extranonce_len;
+    job->coinbase_prefix_len = large_coinbase ? 1024 : 1;
+    memset(job->coinbase_prefix, large_coinbase ? 0xa5 : 0x01, job->coinbase_prefix_len);
+    job->coinbase_suffix[0] = large_coinbase ? 0x5a : 0x02;
+    job->coinbase_suffix_len = 1;
+    return job;
+}
+
+TEST_CASE("job allocation failure skips a send and permits the next cycle",
+          "[mining][job-building][job-task]")
+{
+    (void)prepare_followup_job(1, false);
+    const job_pipeline_fixture_event_t events[] = {
+        { .type = JOB_PIPELINE_FIXTURE_NOTIFY, .slot = 0 },
+        { .type = JOB_PIPELINE_FIXTURE_TIMEOUT },
+    };
+    job_pipeline_fixture_result_t result;
+    job_pipeline_fixture_run(
+        (job_pipeline_fixture_config_t) {
+            .hardware_version_rolling = true,
+            .asic_initialized = true,
+            .job_frequency_ms = 1,
+            .allocation_failure_at = 1,
+        }, events, sizeof(events) / sizeof(events[0]), &result);
+
+    TEST_ASSERT_EQUAL_UINT32(2, result.allocation_count);
+    TEST_ASSERT_EQUAL_UINT32(1, result.job_count);
+    TEST_ASSERT_EQUAL_UINT32(1, result.coinbase_decode_count);
+    TEST_ASSERT_EQUAL_UINT32(1, result.version_mask_count);
+    TEST_ASSERT_EQUAL_STRING("followup", result.jobs[0]->jobid);
+    TEST_ASSERT_EQUAL_STRING("01", result.jobs[0]->extranonce2);
+    assert_hex32("c528516952ea823ab4cd034973550175c63ebf0f49cb126ccee58049a3fc487c",
+                 result.jobs[0]->merkle_root);
+    job_pipeline_fixture_result_free(&result);
+}
+
+TEST_CASE("zero-length extranonce waits for new work and preserves owned metadata",
+          "[mining][job-building][job-task]")
+{
+    miner_job_t *job = prepare_followup_job(0, false);
+    const job_pipeline_fixture_event_t events[] = {
+        { .type = JOB_PIPELINE_FIXTURE_NOTIFY, .slot = 0 },
+        { .type = JOB_PIPELINE_FIXTURE_TIMEOUT },
+        { .type = JOB_PIPELINE_FIXTURE_NOTIFY, .slot = 0 },
+    };
+    job_pipeline_fixture_result_t result;
+    job_pipeline_fixture_run(
+        (job_pipeline_fixture_config_t) {
+            .hardware_version_rolling = true,
+            .asic_initialized = true,
+            .job_frequency_ms = 1,
+        }, events, sizeof(events) / sizeof(events[0]), &result);
+
+    TEST_ASSERT_EQUAL_UINT32(2, result.job_count);
+    TEST_ASSERT_EQUAL_UINT32(2, result.allocation_count);
+    TEST_ASSERT_EQUAL_UINT32(2, result.coinbase_decode_count);
+    job->job_id[0] = 'x';
+    for (size_t i = 0; i < result.job_count; ++i) {
+        TEST_ASSERT_EQUAL_STRING("followup", result.jobs[i]->jobid);
+        TEST_ASSERT_EQUAL_STRING("", result.jobs[i]->extranonce2);
+        TEST_ASSERT_EQUAL_HEX32(0x20000004, result.jobs[i]->version);
+        TEST_ASSERT_EQUAL_HEX32(0x1fffe000, result.jobs[i]->version_mask);
+        TEST_ASSERT_EQUAL_HEX32(0x64658bd8, result.jobs[i]->ntime);
+        TEST_ASSERT_EQUAL_HEX32(0x1705dd01, result.jobs[i]->target);
+        assert_hex32("3a649bdbf2ac5b0eb5b71ca2aa5cd632c378b2e83dcd84c2d915d25176a56ace",
+                     result.jobs[i]->merkle_root);
+    }
+    job_pipeline_fixture_result_free(&result);
+}
+
+TEST_CASE("large coinbase job uses heap hashing and retains extranonce order",
+          "[mining][job-building][job-task]")
+{
+    (void)prepare_followup_job(1, true);
+    const job_pipeline_fixture_event_t events[] = {
+        { .type = JOB_PIPELINE_FIXTURE_NOTIFY, .slot = 0 },
+        { .type = JOB_PIPELINE_FIXTURE_TIMEOUT },
+    };
+    job_pipeline_fixture_result_t result;
+    job_pipeline_fixture_run(
+        (job_pipeline_fixture_config_t) {
+            .hardware_version_rolling = true,
+            .asic_initialized = true,
+            .job_frequency_ms = 1,
+        }, events, sizeof(events) / sizeof(events[0]), &result);
+
+    TEST_ASSERT_EQUAL_UINT32(2, result.job_count);
+    TEST_ASSERT_EQUAL_UINT32(4, result.allocation_count);
+    TEST_ASSERT_EQUAL_UINT32(1, result.coinbase_decode_count);
+    TEST_ASSERT_EQUAL_STRING("00", result.jobs[0]->extranonce2);
+    TEST_ASSERT_EQUAL_STRING("01", result.jobs[1]->extranonce2);
+    assert_hex32("8f15704dd6a5716fe3390d9ee30f6081fa9a52e7b0c68650dbbebbad69f306a3",
+                 result.jobs[0]->merkle_root);
+    assert_hex32("81d3867d9d36bed64c0a3ecdae4792715cb93cd46f02f9dc3720d004b2850a23",
+                 result.jobs[1]->merkle_root);
+    job_pipeline_fixture_result_free(&result);
+}

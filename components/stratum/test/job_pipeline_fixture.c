@@ -1,3 +1,4 @@
+#include "mining_fixture_bindings.h"
 #include "job_pipeline_fixture.h"
 
 #include <setjmp.h>
@@ -159,6 +160,7 @@ void job_pipeline_fixture_run(
     fixture_event_index = 0;
     fixture_result = result;
     fixture_job_frequency_ms = config.job_frequency_ms;
+    mining_allocator_fixture_reset(config.allocation_failure_at);
 
     int exit_reason = setjmp(fixture_exit);
     if (exit_reason == 0) {
@@ -166,10 +168,12 @@ void job_pipeline_fixture_run(
     }
 
     result->active_job_slot = fixture_state.active_job_slot_idx;
+    result->allocation_count = mining_allocator_fixture_calls();
     fixture_events = NULL;
     fixture_event_count = 0;
     fixture_event_index = 0;
     fixture_result = NULL;
+    mining_allocator_fixture_reset(0);
 }
 
 void job_pipeline_fixture_result_free(job_pipeline_fixture_result_t *result)

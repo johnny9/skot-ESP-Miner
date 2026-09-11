@@ -2,7 +2,7 @@
 
 #include "job_pipeline_fixture.h"
 #include "mining.h"
-#include "stratum_api.h"
+#include "sv1_protocol.h"
 #include "sv2_protocol.h"
 #include "utils.h"
 

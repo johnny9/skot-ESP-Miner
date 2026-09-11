@@ -75,6 +75,12 @@ add_executable(
     src/host_platform_stubs.c
     src/esp_log_host.c
     ${host_test_sources}
+    ../components/stratum/test/job_pipeline_fixture.c
+    ../components/asic/test/bm13xx_fixture.c
+    ../components/asic/bm1366.c
+    ../components/asic/bm1368.c
+    ../components/asic/bm1370.c
+    ../components/asic/bm1373.c
     ../components/stratum/stratum_protocol.c
     ../components/stratum/sv1_protocol.c
     ../components/stratum/miner_job.c
@@ -87,6 +93,7 @@ add_executable(
     ../components/asic/pll.c
     ../components/asic/asic_common.c
     ../components/asic/crc.c
+    ../main/tasks/create_jobs_task.c
 )
 
 # Keep the imported libbase58 implementation unchanged in this foundation PR.
@@ -96,7 +103,34 @@ set_source_files_properties(
     PROPERTIES COMPILE_OPTIONS -Wno-vla
 )
 
+# The job task does not include its own prototype header.
+# Force it into the direct host compilation so strict prototype warnings stay
+# enabled without modifying the production source for this test-only branch.
+set_source_files_properties(
+    ../main/tasks/create_jobs_task.c
+    PROPERTIES
+        COMPILE_OPTIONS
+            "-include;${CMAKE_CURRENT_SOURCE_DIR}/../main/tasks/create_jobs_task.h"
+)
+
 target_compile_features(esp_miner_host_tests PRIVATE c_std_11)
+
+# Keep firmware sources unchanged and instrument them directly. The bindings
+# select test I/O and private symbol names, matching the target-test fixtures.
+set_source_files_properties(
+    ../components/asic/bm1366.c
+    ../components/asic/bm1368.c
+    ../components/asic/bm1370.c
+    ../components/asic/bm1373.c
+    PROPERTIES COMPILE_OPTIONS
+        "-include;${CMAKE_CURRENT_SOURCE_DIR}/../components/asic/test/bm13xx_fixture_bindings.h"
+)
+
+# BM1368's existing initialization loops compare int indices with sizeof.
+# Keep that cleanup for a production follow-up, not this characterization work.
+set_property(SOURCE ../components/asic/bm1368.c APPEND PROPERTY
+    COMPILE_OPTIONS -Wno-sign-compare
+)
 target_compile_definitions(
     esp_miner_host_tests
     PRIVATE
@@ -156,7 +190,9 @@ target_include_directories(
     esp_miner_host_tests
     PRIVATE
         include
+        ../components/stratum/test/fixtures
         ${cjson_SOURCE_DIR}
+        ../components/stratum/test
         ../components/stratum/include
         ../components/stratum_v2/include
         ../components/asic/include

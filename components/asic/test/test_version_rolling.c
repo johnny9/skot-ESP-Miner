@@ -1,44 +1,11 @@
 #include "unity.h"
 
 #include "bm13xx_fixture.h"
-#include "stratum_api.h"
+#include "sv1_protocol.h"
 #include "sv2_protocol.h"
 #include "utils.h"
 
 #include <string.h>
-
-typedef struct {
-    char bytes[256];
-    size_t length;
-} sv1_capture_t;
-
-static int capture_sv1_write(esp_transport_handle_t transport,
-                             const char *buffer, int length, int timeout_ms)
-{
-    (void)timeout_ms;
-    sv1_capture_t *capture =
-        (sv1_capture_t *)esp_transport_get_context_data(transport);
-    TEST_ASSERT_NOT_NULL(capture);
-    TEST_ASSERT_GREATER_THAN_INT(0, length);
-    TEST_ASSERT_LESS_THAN_UINT32(sizeof(capture->bytes), (uint32_t)length);
-    memcpy(capture->bytes, buffer, (size_t)length);
-    capture->bytes[length] = '\0';
-    capture->length = (size_t)length;
-    return length;
-}
-
-static esp_transport_handle_t create_sv1_capture(sv1_capture_t *capture)
-{
-    esp_transport_handle_t transport = esp_transport_init();
-    if (transport == NULL ||
-        esp_transport_set_context_data(transport, capture) != ESP_OK ||
-        esp_transport_set_func(transport, NULL, NULL, capture_sv1_write,
-                               NULL, NULL, NULL, NULL) != ESP_OK) {
-        esp_transport_destroy(transport);
-        return NULL;
-    }
-    return transport;
-}
 
 /* Fixed wire values, including CRC5. Expected bytes are not built by the
  * production encoder or by a second copy of the version-mask algorithm. */
@@ -216,7 +183,6 @@ TEST_CASE("BM1373 version mask writes retry without changing command bytes",
 TEST_CASE("BM13xx rolled version reaches SV1 and SV2 share messages byte exact",
           "[asic][version-rolling][stratum][characterization]")
 {
-    TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
     for (size_t d = 0; d < BM13XX_FIXTURE_DRIVER_COUNT; d++) {
         const bm13xx_fixture_driver_t *driver = &bm13xx_fixture_drivers[d];
         GlobalState *state = bm13xx_fixture_begin();
@@ -231,21 +197,17 @@ TEST_CASE("BM13xx rolled version reaches SV1 and SV2 share messages byte exact",
         TEST_ASSERT_EQUAL_HEX32(0x20002004, rolled_version);
         TEST_ASSERT_EQUAL_HEX32(0x00002000, version_bits);
 
-        /* Capture the bytes at the transport seam without a network peer. */
-        sv1_capture_t sv1_capture = {0};
-        esp_transport_handle_t sv1_transport = create_sv1_capture(&sv1_capture);
-        TEST_ASSERT_NOT_NULL(sv1_transport);
-        int sv1_length = STRATUM_V1_submit_share(
-            sv1_transport, 7, "worker", "job-1", "0000000000000000",
-            0x64658bd8, result->nonce, version_bits, NULL);
+        /* These are real encoders, not the network share-submission task. */
+        char sv1_message[256] = {0};
+        int sv1_length = STRATUM_V1_encode_submit_share(
+            sv1_message, sizeof(sv1_message), 7, "worker", "job-1",
+            "0000000000000000", 0x64658bd8, result->nonce, version_bits);
         const char *expected_sv1 =
             "{\"id\":7,\"method\":\"mining.submit\",\"params\":["
             "\"worker\",\"job-1\",\"0000000000000000\","
             "\"64658bd8\",\"0a4c049b\",\"00002000\"]}\n";
         TEST_ASSERT_EQUAL_INT((int)strlen(expected_sv1), sv1_length);
-        TEST_ASSERT_EQUAL_UINT((size_t)sv1_length, sv1_capture.length);
-        TEST_ASSERT_EQUAL_STRING(expected_sv1, sv1_capture.bytes);
-        esp_transport_destroy(sv1_transport);
+        TEST_ASSERT_EQUAL_STRING(expected_sv1, sv1_message);
 
         uint8_t sv2_message[SV2_SUBMIT_SHARES_MAX_FRAME_SIZE] = {0};
         int sv2_length = sv2_build_submit_shares(

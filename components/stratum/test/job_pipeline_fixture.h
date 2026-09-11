@@ -12,6 +12,7 @@ typedef struct {
     uint8_t software_midstates;
     bool asic_initialized;
     int job_frequency_ms;
+    size_t allocation_failure_at;
 } job_pipeline_fixture_config_t;
 
 #define JOB_PIPELINE_FIXTURE_MAX_EVENTS 8
@@ -35,6 +36,7 @@ typedef struct {
     size_t coinbase_decode_count;
     size_t delay_count;
     uint8_t active_job_slot;
+    size_t allocation_count;
 } job_pipeline_fixture_result_t;
 
 /*

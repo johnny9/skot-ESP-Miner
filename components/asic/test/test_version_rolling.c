@@ -1,6 +1,6 @@
 #include "unity.h"
 
-#include "bm13xx_fixture.h"
+#include "bm13xx_test_harness.h"
 #include "stratum_api.h"
 #include "sv2_protocol.h"
 #include "utils.h"
@@ -48,21 +48,21 @@ static const uint8_t full_mask_command[] = {
 
 static void assert_packet(const uint8_t expected[11], size_t index)
 {
-    const bm13xx_fixture_packet_t *packet = bm13xx_fixture_packet(index);
+    const bm13xx_harness_packet_t *packet = bm13xx_harness_packet(index);
     TEST_ASSERT_EQUAL_UINT(11, packet->length);
     TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, packet->bytes, 11);
 }
 
-static void queue_job_response(const bm13xx_fixture_driver_t *driver,
+static void queue_job_response(const bm13xx_harness_driver_t *driver,
                                uint8_t version_high, uint8_t version_low)
 {
-    /* receive_work supplies an already-framed response. Its CRC validation is
-     * outside this fixture; the last byte marks a job rather than a register. */
+    /* The receive fake supplies an already-framed response. CRC validation is
+     * outside this harness; the last byte marks a job rather than a register. */
     const uint8_t response[] = {
         0xaa, 0x55, 0x9b, 0x04, 0x4c, 0x0a, 0x00,
         driver->response_job_id, version_high, version_low, 0x80,
     };
-    bm13xx_fixture_queue_response(response);
+    bm13xx_harness_queue_response(response);
 }
 
 TEST_CASE("BM13xx version mask register command remains byte exact",
@@ -82,35 +82,35 @@ TEST_CASE("BM13xx version mask register command remains byte exact",
         {0xffffffff, {0x55, 0xaa, 0x51, 9, 0, 0xa4, 0x90, 0, 0xff, 0xff, 0x1c}},
     };
 
-    for (size_t d = 0; d < BM13XX_FIXTURE_DRIVER_COUNT; d++) {
-        bm13xx_fixture_begin();
+    for (size_t d = 0; d < BM13XX_HARNESS_DRIVER_COUNT; d++) {
+        bm13xx_harness_begin();
         for (size_t c = 0; c < sizeof(cases) / sizeof(cases[0]); c++) {
-            bm13xx_fixture_clear_packets();
-            bm13xx_fixture_drivers[d].set_version_mask(cases[c].mask);
-            TEST_ASSERT_EQUAL_UINT(1, bm13xx_fixture_packet_count());
+            bm13xx_harness_clear_packets();
+            bm13xx_harness_drivers[d].set_version_mask(cases[c].mask);
+            TEST_ASSERT_EQUAL_UINT(1, bm13xx_harness_packet_count());
             assert_packet(cases[c].expected, 0);
         }
-        bm13xx_fixture_end();
+        bm13xx_harness_end();
     }
 }
 
 TEST_CASE("BM13xx initialization enables the full version rolling mask",
           "[asic][version-rolling][characterization]")
 {
-    for (size_t d = 0; d < BM13XX_FIXTURE_DRIVER_COUNT; d++) {
-        const bm13xx_fixture_driver_t *driver = &bm13xx_fixture_drivers[d];
-        GlobalState *state = bm13xx_fixture_begin();
+    for (size_t d = 0; d < BM13XX_HARNESS_DRIVER_COUNT; d++) {
+        const bm13xx_harness_driver_t *driver = &bm13xx_harness_drivers[d];
+        GlobalState *state = bm13xx_harness_begin();
         TEST_ASSERT_EQUAL_UINT8_MESSAGE(2, driver->init(state), driver->name);
         unsigned mask_count = 0;
-        for (size_t p = 0; p < bm13xx_fixture_packet_count(); p++) {
-            const bm13xx_fixture_packet_t *packet = bm13xx_fixture_packet(p);
+        for (size_t p = 0; p < bm13xx_harness_packet_count(); p++) {
+            const bm13xx_harness_packet_t *packet = bm13xx_harness_packet(p);
             if (packet->length == 11 && packet->bytes[5] == 0xa4) {
                 assert_packet(full_mask_command, p);
                 mask_count++;
             }
         }
         TEST_ASSERT_EQUAL_UINT_MESSAGE(driver->init_mask_count, mask_count, driver->name);
-        bm13xx_fixture_end();
+        bm13xx_harness_end();
     }
 }
 
@@ -133,12 +133,12 @@ TEST_CASE("BM13xx response version bits reconstruct rolled block versions",
         {0x21002004, {0x00, 0x02}, 0x21006004},
     };
 
-    for (size_t d = 0; d < BM13XX_FIXTURE_DRIVER_COUNT; d++) {
-        const bm13xx_fixture_driver_t *driver = &bm13xx_fixture_drivers[d];
-        GlobalState *state = bm13xx_fixture_begin();
+    for (size_t d = 0; d < BM13XX_HARNESS_DRIVER_COUNT; d++) {
+        const bm13xx_harness_driver_t *driver = &bm13xx_harness_drivers[d];
+        GlobalState *state = bm13xx_harness_begin();
         TEST_ASSERT_EQUAL_UINT8(2, driver->init(state));
         for (size_t c = 0; c < sizeof(cases) / sizeof(cases[0]); c++) {
-            bm13xx_fixture_set_job(cases[c].base_version, true, true);
+            bm13xx_harness_set_job(cases[c].base_version, true, true);
             queue_job_response(driver, cases[c].wire_bytes[0], cases[c].wire_bytes[1]);
             const task_result *result = driver->process_work(state);
             TEST_ASSERT_NOT_NULL(result);
@@ -153,24 +153,24 @@ TEST_CASE("BM13xx response version bits reconstruct rolled block versions",
             TEST_ASSERT_EQUAL_INT(REGISTER_INVALID, result->register_type);
             TEST_ASSERT_NULL(driver->process_work(state)); /* response consumed */
         }
-        bm13xx_fixture_end();
+        bm13xx_harness_end();
     }
 }
 
 TEST_CASE("BM13xx missing jobs and register replies do not produce rolled shares",
           "[asic][version-rolling][characterization]")
 {
-    for (size_t d = 0; d < BM13XX_FIXTURE_DRIVER_COUNT; d++) {
-        const bm13xx_fixture_driver_t *driver = &bm13xx_fixture_drivers[d];
-        GlobalState *state = bm13xx_fixture_begin();
+    for (size_t d = 0; d < BM13XX_HARNESS_DRIVER_COUNT; d++) {
+        const bm13xx_harness_driver_t *driver = &bm13xx_harness_drivers[d];
+        GlobalState *state = bm13xx_harness_begin();
         TEST_ASSERT_EQUAL_UINT8(2, driver->init(state));
         TEST_ASSERT_NULL(driver->process_work(state));
         for (unsigned flags = 0; flags < 3; flags++) {
-            bm13xx_fixture_set_job(0x20000004, (flags & 1) != 0, (flags & 2) != 0);
+            bm13xx_harness_set_job(0x20000004, (flags & 1) != 0, (flags & 2) != 0);
             queue_job_response(driver, 0xff, 0xff);
             TEST_ASSERT_NULL(driver->process_work(state));
         }
-        bm13xx_fixture_set_job(0x20000004, true, true);
+        bm13xx_harness_set_job(0x20000004, true, true);
         queue_job_response(driver, 0, 1);
         TEST_ASSERT_NOT_NULL(driver->process_work(state));
 
@@ -178,7 +178,7 @@ TEST_CASE("BM13xx missing jobs and register replies do not produce rolled shares
         const uint8_t register_response[] = {
             0xaa, 0x55, 0x12, 0x34, 0x56, 0x78, 0, 0x4c, 0, 0, 0,
         };
-        bm13xx_fixture_queue_response(register_response);
+        bm13xx_harness_queue_response(register_response);
         const task_result *result = driver->process_work(state);
         TEST_ASSERT_NOT_NULL(result);
         TEST_ASSERT_EQUAL_INT(REGISTER_ERROR_COUNT, result->register_type);
@@ -188,41 +188,41 @@ TEST_CASE("BM13xx missing jobs and register replies do not produce rolled shares
         const uint8_t unknown_register[] = {
             0xaa, 0x55, 0, 0, 0, 0, 0, 1, 0, 0, 0,
         };
-        bm13xx_fixture_queue_response(unknown_register);
+        bm13xx_harness_queue_response(unknown_register);
         TEST_ASSERT_NULL(driver->process_work(state));
-        bm13xx_fixture_end();
+        bm13xx_harness_end();
     }
 }
 
 TEST_CASE("BM1373 version mask writes retry without changing command bytes",
           "[asic][version-rolling][characterization]")
 {
-    const bm13xx_fixture_driver_t *driver = &bm13xx_fixture_drivers[3];
-    bm13xx_fixture_begin();
+    const bm13xx_harness_driver_t *driver = &bm13xx_harness_drivers[3];
+    bm13xx_harness_begin();
     for (unsigned failures = 0; failures <= 3; failures++) {
-        bm13xx_fixture_clear_packets();
-        bm13xx_fixture_fail_writes(failures);
+        bm13xx_harness_clear_packets();
+        bm13xx_harness_fail_writes(failures);
         driver->set_version_mask(BIP320_VERSION_ROLLING_MASK);
         unsigned attempts = failures < 3 ? failures + 1 : 3;
-        TEST_ASSERT_EQUAL_UINT(attempts, bm13xx_fixture_packet_count());
-        TEST_ASSERT_EQUAL_UINT(attempts - 1, bm13xx_fixture_delay_count());
+        TEST_ASSERT_EQUAL_UINT(attempts, bm13xx_harness_packet_count());
+        TEST_ASSERT_EQUAL_UINT(attempts - 1, bm13xx_harness_delay_count());
         for (unsigned p = 0; p < attempts; p++) {
             assert_packet(full_mask_command, p);
         }
     }
-    bm13xx_fixture_end();
+    bm13xx_harness_end();
 }
 
 TEST_CASE("BM13xx rolled version reaches SV1 and SV2 share messages byte exact",
           "[asic][version-rolling][stratum][characterization]")
 {
     TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
-    for (size_t d = 0; d < BM13XX_FIXTURE_DRIVER_COUNT; d++) {
-        const bm13xx_fixture_driver_t *driver = &bm13xx_fixture_drivers[d];
-        GlobalState *state = bm13xx_fixture_begin();
+    for (size_t d = 0; d < BM13XX_HARNESS_DRIVER_COUNT; d++) {
+        const bm13xx_harness_driver_t *driver = &bm13xx_harness_drivers[d];
+        GlobalState *state = bm13xx_harness_begin();
         TEST_ASSERT_EQUAL_UINT8(2, driver->init(state));
         const uint32_t base_version = 0x20000004;
-        bm13xx_fixture_set_job(base_version, true, true);
+        bm13xx_harness_set_job(base_version, true, true);
         queue_job_response(driver, 0, 1);
         const task_result *result = driver->process_work(state);
         TEST_ASSERT_NOT_NULL(result);
@@ -262,6 +262,6 @@ TEST_CASE("BM13xx rolled version reaches SV1 and SV2 share messages byte exact",
         };
         TEST_ASSERT_EQUAL_INT(sizeof(expected_sv2), sv2_length);
         TEST_ASSERT_EQUAL_UINT8_ARRAY(expected_sv2, sv2_message, sizeof(expected_sv2));
-        bm13xx_fixture_end();
+        bm13xx_harness_end();
     }
 }

@@ -1,5 +1,5 @@
-#include "bm13xx_fixture_bindings.h"
-#include "bm13xx_fixture.h"
+#include "bm13xx_test_bindings.h"
+#include "bm13xx_test_harness.h"
 
 #include <pthread.h>
 #include <string.h>
@@ -13,8 +13,8 @@
 #include "serial.h"
 #include "unity.h"
 
-const bm13xx_fixture_driver_t
-    bm13xx_fixture_drivers[BM13XX_FIXTURE_DRIVER_COUNT] = {
+const bm13xx_harness_driver_t
+    bm13xx_harness_drivers[BM13XX_HARNESS_DRIVER_COUNT] = {
         {"BM1366", BM1366_init, BM1366_send_work, BM1366_set_version_mask, BM1366_process_work, 0x13, 4},
         {"BM1368", BM1368_init, BM1368_send_work, BM1368_set_version_mask, BM1368_process_work, 0x23, 5},
         {"BM1370", BM1370_init, BM1370_send_work, BM1370_set_version_mask, BM1370_process_work, 0x23, 4},
@@ -26,14 +26,14 @@ static GlobalState fixture_state;
 static bm_job saved_job;
 static bm_job *active_jobs[JOB_SLOTS];
 static uint8_t valid_jobs[JOB_SLOTS];
-static bm13xx_fixture_packet_t packets[MAX_PACKETS];
+static bm13xx_harness_packet_t packets[MAX_PACKETS];
 static size_t packet_count;
-static uint8_t queued_response[BM13XX_FIXTURE_RESPONSE_SIZE];
+static uint8_t queued_response[BM13XX_HARNESS_RESPONSE_SIZE];
 static bool response_ready;
 static unsigned failed_writes;
 static unsigned delay_count;
 
-GlobalState *bm13xx_fixture_begin(void)
+GlobalState *bm13xx_harness_begin(void)
 {
     memset(active_jobs, 0, sizeof(active_jobs));
     memset(valid_jobs, 0, sizeof(valid_jobs));
@@ -56,7 +56,7 @@ GlobalState *bm13xx_fixture_begin(void)
     return &fixture_state;
 }
 
-void bm13xx_fixture_end(void)
+void bm13xx_harness_end(void)
 {
     for (size_t index = 0; index < JOB_SLOTS; ++index) {
         if (active_jobs[index] != NULL && active_jobs[index] != &saved_job) {
@@ -73,30 +73,30 @@ void bm13xx_fixture_end(void)
         &fixture_state.ASIC_TASK_MODULE.valid_jobs_lock));
 }
 
-void bm13xx_fixture_clear_packets(void)
+void bm13xx_harness_clear_packets(void)
 {
     packet_count = 0;
     delay_count = 0;
 }
 
-size_t bm13xx_fixture_packet_count(void)
+size_t bm13xx_harness_packet_count(void)
 {
     return packet_count;
 }
 
-const bm13xx_fixture_packet_t *bm13xx_fixture_packet(size_t index)
+const bm13xx_harness_packet_t *bm13xx_harness_packet(size_t index)
 {
     TEST_ASSERT_TRUE(index < packet_count);
     return &packets[index];
 }
 
-bm_job *bm13xx_fixture_active_job(uint8_t job_id)
+bm_job *bm13xx_harness_active_job(uint8_t job_id)
 {
     TEST_ASSERT_TRUE(job_id < JOB_SLOTS);
     return active_jobs[job_id];
 }
 
-void bm13xx_fixture_install_job(uint8_t job_id, bm_job *job)
+void bm13xx_harness_install_job(uint8_t job_id, bm_job *job)
 {
     TEST_ASSERT_TRUE(job_id < JOB_SLOTS);
     TEST_ASSERT_NULL(active_jobs[job_id]);
@@ -104,25 +104,25 @@ void bm13xx_fixture_install_job(uint8_t job_id, bm_job *job)
     valid_jobs[job_id] = 1;
 }
 
-void bm13xx_fixture_fail_writes(unsigned count)
+void bm13xx_harness_fail_writes(unsigned count)
 {
     failed_writes = count;
 }
 
-unsigned bm13xx_fixture_delay_count(void)
+unsigned bm13xx_harness_delay_count(void)
 {
     return delay_count;
 }
 
-void bm13xx_fixture_set_job(uint32_t version, bool valid, bool present)
+void bm13xx_harness_set_job(uint32_t version, bool valid, bool present)
 {
     saved_job = (bm_job) {.version = version};
     active_jobs[JOB_SLOT] = present ? &saved_job : NULL;
     valid_jobs[JOB_SLOT] = valid;
 }
 
-void bm13xx_fixture_queue_response(
-    const uint8_t response[BM13XX_FIXTURE_RESPONSE_SIZE])
+void bm13xx_harness_queue_response(
+    const uint8_t response[BM13XX_HARNESS_RESPONSE_SIZE])
 {
     response_ready = response != NULL;
     if (response_ready) {
@@ -130,12 +130,12 @@ void bm13xx_fixture_queue_response(
     }
 }
 
-int SERIAL_send(uint8_t *bytes, int length, bool debug)
+int bm13xx_spy_serial_send(uint8_t *bytes, int length, bool debug)
 {
     (void)debug;
     TEST_ASSERT_TRUE(packet_count < MAX_PACKETS);
     TEST_ASSERT_TRUE(length > 0 && (size_t)length <= sizeof(packets[0].bytes));
-    bm13xx_fixture_packet_t *packet = &packets[packet_count++];
+    bm13xx_harness_packet_t *packet = &packets[packet_count++];
     packet->length = (size_t)length;
     memcpy(packet->bytes, bytes, packet->length);
     if (failed_writes > 0) {
@@ -145,17 +145,18 @@ int SERIAL_send(uint8_t *bytes, int length, bool debug)
     return length;
 }
 
-esp_err_t SERIAL_set_baud(int baud)
+esp_err_t bm13xx_stub_serial_set_baud(int baud)
 {
     TEST_ASSERT_EQUAL_INT(3000000, baud);
     return ESP_OK;
 }
 
-void SERIAL_clear_buffer(void)
+void bm13xx_stub_serial_clear_buffer(void)
 {
 }
 
-esp_err_t receive_work(uint8_t *buffer, int size, uint64_t *timestamp_us)
+esp_err_t bm13xx_fake_receive_work(uint8_t *buffer, int size,
+                                  uint64_t *timestamp_us)
 {
     TEST_ASSERT_EQUAL_INT(sizeof(queued_response), size);
     if (!response_ready) {
@@ -167,14 +168,15 @@ esp_err_t receive_work(uint8_t *buffer, int size, uint64_t *timestamp_us)
     return ESP_OK;
 }
 
-int count_asic_chips(uint16_t count, uint16_t chip_id, int response_length)
+int bm13xx_stub_count_chips(uint16_t count, uint16_t chip_id,
+                           int response_length)
 {
     (void)chip_id;
     TEST_ASSERT_EQUAL_INT(11, response_length);
     return count;
 }
 
-int count_asic_chips_with_id_alias(
+int bm13xx_stub_count_chips_with_alias(
     uint16_t count, uint16_t chip_id, uint16_t alias, int response_length)
 {
     TEST_ASSERT_EQUAL_HEX16(0x1372, chip_id);
@@ -183,14 +185,15 @@ int count_asic_chips_with_id_alias(
     return count;
 }
 
-void do_frequency_transition(GlobalState *state, set_hash_frequency_fn set_frequency)
+void bm13xx_stub_frequency_transition(
+    GlobalState *state, set_hash_frequency_fn set_frequency)
 {
     /* Clock ramps are outside the version-rolling contract. */
     (void)state;
     (void)set_frequency;
 }
 
-void bm13xx_fixture_delay(TickType_t ticks)
+void bm13xx_spy_delay(TickType_t ticks)
 {
     (void)ticks;
     delay_count++;

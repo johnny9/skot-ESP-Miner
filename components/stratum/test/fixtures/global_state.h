@@ -7,6 +7,7 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "scoreboard.h"
 
 /*
  * Shared test view for the real job task and isolated BM13xx driver copies.
@@ -37,6 +38,13 @@ typedef struct GlobalState {
         float actual_frequency;
     } POWER_MANAGEMENT_MODULE;
     bool ASIC_initalized;
+    struct {
+        float process_time;
+        Scoreboard scoreboard;
+    } SYSTEM_MODULE;
+    struct {
+        bool is_active;
+    } SELF_TEST_MODULE;
 } GlobalState;
 
 #endif /* TEST_FIXTURE_GLOBAL_STATE_H */

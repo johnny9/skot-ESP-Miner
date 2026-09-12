@@ -28,13 +28,21 @@ logic under test is unchanged.
 | `result_task_test_bindings.h` | Gives the result task a private test name. It connects ASIC results, share submission, scoring, self-test, and register calls to test doubles. |
 | `result_task_test_instance.c` | Builds an isolated instance of the real ASIC result task. |
 
-## Coverage files
+## Tests that use these support modules
 
 | File | Main coverage |
 | --- | --- |
 | `test_bitmain_job_packets.c` | Work packet fields, work-slot replacement, share responses, register responses, inactive jobs, and repeated nonces. |
 | `test_version_rolling.c` | Version-mask commands, driver setup, rolled-version results, write retries, missing jobs, register responses, and submitted share fields. |
 | `test_asic_result_task.c` | Result processing, owned job snapshots, all job protocols, register routing, unavailable slots, share thresholds, self-test results, and repeated results. |
+
+## Other tests in this directory
+
+| File | Main coverage |
+| --- | --- |
+| `test_pll.c` | PLL divider selection and the calculated ASIC frequency. |
+| `test_timeout.c` | ASIC timeout calculation for different chips, chain sizes, version spaces, and the zero-chip default. |
+| `test_job_command.c` | A disabled hardware example for sending a BM1397 job and reading its result. It does not contain an active test. |
 
 ## Test double names
 

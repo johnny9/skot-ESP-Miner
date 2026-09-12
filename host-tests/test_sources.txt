@@ -12,6 +12,7 @@ components/stratum/test/test_job_building.c
 components/stratum/test/test_utils.c
 components/stratum_v2/test/test_sv2.c
 components/asic/test/test_pll.c
+components/asic/test/test_asic_result_task.c
 components/asic/test/test_bitmain_job_packets.c
 components/asic/test/test_timeout.c
 components/asic/test/test_version_rolling.c

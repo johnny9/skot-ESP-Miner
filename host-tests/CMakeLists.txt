@@ -97,6 +97,7 @@ add_executable(
     ../components/asic/asic_common.c
     ../components/asic/crc.c
     ../main/tasks/create_jobs_task.c
+    ../main/tasks/asic_result_task.c
 )
 
 # Keep the imported libbase58 implementation unchanged in this foundation PR.
@@ -114,6 +115,14 @@ set_source_files_properties(
     PROPERTIES
         COMPILE_OPTIONS
             "-include;${CMAKE_CURRENT_SOURCE_DIR}/../main/tasks/create_jobs_task.h"
+)
+
+# Compile the actual result task with deterministic scheduler and submission
+# boundaries. The target-test copy uses the same bindings.
+set_source_files_properties(
+    ../main/tasks/asic_result_task.c
+    PROPERTIES COMPILE_OPTIONS
+        "-include;${CMAKE_CURRENT_SOURCE_DIR}/../components/asic/test/result_fixture_bindings.h"
 )
 
 # Interpose allocation only in the real job producer and coinbase builder.
@@ -218,6 +227,8 @@ target_include_directories(
         ../components/stratum/include
         ../components/stratum_v2/include
         ../components/asic/include
+        ../main/tasks
+        ../main/self_test
 )
 
 target_link_libraries(

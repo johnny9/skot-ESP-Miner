@@ -5,7 +5,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-/* Test-build names keep these copies separate from firmware drivers in QEMU.
+/* Test-build names keep these copies separate from the firmware drivers.
  * Only external I/O and timing are replaced; no driver logic is compiled out.
  * The host compiles each production source directly for accurate coverage. */
 #ifdef vTaskDelay

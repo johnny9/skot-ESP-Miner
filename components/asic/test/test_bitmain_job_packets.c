@@ -234,6 +234,9 @@ TEST_CASE("BM1397 rejects inactive job results and repeated nonces",
     TEST_ASSERT_NULL(bm1397_fixture_driver.process_work(state));
     queue_bm1397_job_response(0x7c, 0, 0x13579bdf);
     TEST_ASSERT_NULL(bm1397_fixture_driver.process_work(state));
+    bm1397_fixture_mark_job_valid(0x78);
+    queue_bm1397_job_response(0x78, 0, 0x13579be0);
+    TEST_ASSERT_NULL(bm1397_fixture_driver.process_work(state));
 
     bm_job *job = make_job();
     bm1397_fixture_driver.send_work(state, job);

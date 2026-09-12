@@ -30,6 +30,7 @@ size_t bm1397_fixture_packet_count(void);
 const bm1397_fixture_packet_t *bm1397_fixture_packet(size_t index);
 bm_job *bm1397_fixture_active_job(uint8_t job_id);
 void bm1397_fixture_install_job(uint8_t job_id, bm_job *job);
+void bm1397_fixture_mark_job_valid(uint8_t job_id);
 void bm1397_fixture_queue_response(
     const uint8_t response[BM1397_FIXTURE_RESPONSE_SIZE]);
 

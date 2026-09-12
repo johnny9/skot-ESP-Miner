@@ -1,6 +1,6 @@
 #include "unity.h"
 
-#include "job_pipeline_fixture.h"
+#include "job_pipeline_test_harness.h"
 #include "mining.h"
 #include "stratum_api.h"
 #include "sv2_protocol.h"
@@ -118,12 +118,12 @@ TEST_CASE("SV1 notify reaches the ASIC job boundary byte exact",
         "35fd44bf837bdc13c6e5607db472b528a804d248490700000000000000000000",
         miner_job->prev_hash);
 
-    const job_pipeline_fixture_event_t events[] = {
-        { .type = JOB_PIPELINE_FIXTURE_NOTIFY, .slot = 0 },
+    const job_pipeline_harness_event_t events[] = {
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 0 },
     };
-    job_pipeline_fixture_result_t result;
-    job_pipeline_fixture_run(
-        (job_pipeline_fixture_config_t) {
+    job_pipeline_harness_result_t result;
+    job_pipeline_harness_run(
+        (job_pipeline_harness_config_t) {
             .hardware_version_rolling = false,
             .software_midstates = 4,
             .asic_initialized = true,
@@ -159,7 +159,7 @@ TEST_CASE("SV1 notify reaches the ASIC job boundary byte exact",
     miner_job->job_id[0] = 'x';
     TEST_ASSERT_EQUAL_STRING("1f9a56282c", asic_job->jobid);
 
-    job_pipeline_fixture_result_free(&result);
+    job_pipeline_harness_result_free(&result);
     STRATUM_V1_reset_message(&message);
 }
 
@@ -245,14 +245,14 @@ TEST_CASE("SV2 standard messages reach the ASIC job boundary byte exact",
     memcpy(miner_job->merkle_root, merkle_root,
            sizeof(miner_job->merkle_root));
 
-    const job_pipeline_fixture_event_t hardware_events[] = {
-        { .type = JOB_PIPELINE_FIXTURE_NOTIFY,
+    const job_pipeline_harness_event_t hardware_events[] = {
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY,
           .slot = job_id % MINER_JOB_POOL_SIZE },
-        { .type = JOB_PIPELINE_FIXTURE_TIMEOUT },
+        { .type = JOB_PIPELINE_HARNESS_TIMEOUT },
     };
-    job_pipeline_fixture_result_t result;
-    job_pipeline_fixture_run(
-        (job_pipeline_fixture_config_t) {
+    job_pipeline_harness_result_t result;
+    job_pipeline_harness_run(
+        (job_pipeline_harness_config_t) {
             .hardware_version_rolling = true,
             .software_midstates = 0,
             .asic_initialized = true,
@@ -272,15 +272,15 @@ TEST_CASE("SV2 standard messages reach the ASIC job boundary byte exact",
     TEST_ASSERT_EQUAL_STRING("42", asic_job->jobid);
     TEST_ASSERT_EQUAL_STRING("", asic_job->extranonce2);
     TEST_ASSERT_EQUAL_UINT8(0, asic_job->num_midstates);
-    job_pipeline_fixture_result_free(&result);
+    job_pipeline_harness_result_free(&result);
 
-    const job_pipeline_fixture_event_t software_events[] = {
-        { .type = JOB_PIPELINE_FIXTURE_NOTIFY,
+    const job_pipeline_harness_event_t software_events[] = {
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY,
           .slot = job_id % MINER_JOB_POOL_SIZE },
-        { .type = JOB_PIPELINE_FIXTURE_TIMEOUT },
+        { .type = JOB_PIPELINE_HARNESS_TIMEOUT },
     };
-    job_pipeline_fixture_run(
-        (job_pipeline_fixture_config_t) {
+    job_pipeline_harness_run(
+        (job_pipeline_harness_config_t) {
             .hardware_version_rolling = false,
             .software_midstates = 4,
             .asic_initialized = true,
@@ -312,14 +312,14 @@ TEST_CASE("SV2 standard messages reach the ASIC job boundary byte exact",
     TEST_ASSERT_EQUAL_STRING("42", result.jobs[0]->jobid);
     TEST_ASSERT_EQUAL_STRING("42", result.jobs[1]->jobid);
     miner_job->job_id[0] = '4';
-    job_pipeline_fixture_result_free(&result);
+    job_pipeline_harness_result_free(&result);
 
-    const job_pipeline_fixture_event_t unavailable_events[] = {
-        { .type = JOB_PIPELINE_FIXTURE_NOTIFY,
+    const job_pipeline_harness_event_t unavailable_events[] = {
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY,
           .slot = job_id % MINER_JOB_POOL_SIZE },
     };
-    job_pipeline_fixture_run(
-        (job_pipeline_fixture_config_t) {
+    job_pipeline_harness_run(
+        (job_pipeline_harness_config_t) {
             .hardware_version_rolling = true,
             .software_midstates = 0,
             .asic_initialized = false,
@@ -405,14 +405,14 @@ TEST_CASE("SV2 extended messages roll extranonce into the ASIC job byte exact",
     miner_job->extranonce1_len = 2;
     miner_job->extranonce2_len = 8;
 
-    const job_pipeline_fixture_event_t events[] = {
-        { .type = JOB_PIPELINE_FIXTURE_NOTIFY,
+    const job_pipeline_harness_event_t events[] = {
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY,
           .slot = 43 % MINER_JOB_POOL_SIZE },
-        { .type = JOB_PIPELINE_FIXTURE_TIMEOUT },
+        { .type = JOB_PIPELINE_HARNESS_TIMEOUT },
     };
-    job_pipeline_fixture_result_t result;
-    job_pipeline_fixture_run(
-        (job_pipeline_fixture_config_t) {
+    job_pipeline_harness_result_t result;
+    job_pipeline_harness_run(
+        (job_pipeline_harness_config_t) {
             .hardware_version_rolling = true,
             .software_midstates = 0,
             .asic_initialized = true,
@@ -443,10 +443,10 @@ TEST_CASE("SV2 extended messages roll extranonce into the ASIC job byte exact",
     miner_job->job_id[0] = 'x';
     TEST_ASSERT_EQUAL_STRING("43", result.jobs[0]->jobid);
     TEST_ASSERT_EQUAL_STRING("43", result.jobs[1]->jobid);
-    job_pipeline_fixture_result_free(&result);
+    job_pipeline_harness_result_free(&result);
 }
 
-TEST_CASE("job task fixture preserves idle and staged work behavior",
+TEST_CASE("job task harness preserves idle and staged work behavior",
           "[mining][characterization][job-task]")
 {
     miner_job_pool_init();
@@ -473,14 +473,14 @@ TEST_CASE("job task fixture preserves idle and staged work behavior",
                 "cd1be82132ef0d12053dcece1fa0247fcfdb61d4dbd3eb32ea9ef9b4c604a846",
                 job->merkle_root, sizeof(job->merkle_root)));
 
-    const job_pipeline_fixture_event_t events[] = {
-        { .type = JOB_PIPELINE_FIXTURE_TIMEOUT },
-        { .type = JOB_PIPELINE_FIXTURE_NOTIFY, .slot = 5 },
-        { .type = JOB_PIPELINE_FIXTURE_TIMEOUT },
+    const job_pipeline_harness_event_t events[] = {
+        { .type = JOB_PIPELINE_HARNESS_TIMEOUT },
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 5 },
+        { .type = JOB_PIPELINE_HARNESS_TIMEOUT },
     };
-    job_pipeline_fixture_result_t result;
-    job_pipeline_fixture_run(
-        (job_pipeline_fixture_config_t) {
+    job_pipeline_harness_result_t result;
+    job_pipeline_harness_run(
+        (job_pipeline_harness_config_t) {
             .hardware_version_rolling = true,
             .software_midstates = 0,
             .asic_initialized = true,
@@ -494,10 +494,10 @@ TEST_CASE("job task fixture preserves idle and staged work behavior",
     TEST_ASSERT_EQUAL_UINT32(0, result.version_mask_count);
     TEST_ASSERT_EQUAL_UINT8(5, result.active_job_slot);
     TEST_ASSERT_EQUAL_STRING("staged", result.jobs[0]->jobid);
-    job_pipeline_fixture_result_free(&result);
+    job_pipeline_harness_result_free(&result);
 }
 
-TEST_CASE("job task fixture rejects oversized extranonce work",
+TEST_CASE("job task harness rejects oversized extranonce work",
           "[mining][characterization][job-task]")
 {
     miner_job_pool_init();
@@ -510,12 +510,12 @@ TEST_CASE("job task fixture rejects oversized extranonce work",
     job->coinbase_prefix_len = 1;
     job->extranonce2_len = 33;
 
-    const job_pipeline_fixture_event_t events[] = {
-        { .type = JOB_PIPELINE_FIXTURE_NOTIFY, .slot = 6 },
+    const job_pipeline_harness_event_t events[] = {
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 6 },
     };
-    job_pipeline_fixture_result_t result;
-    job_pipeline_fixture_run(
-        (job_pipeline_fixture_config_t) {
+    job_pipeline_harness_result_t result;
+    job_pipeline_harness_run(
+        (job_pipeline_harness_config_t) {
             .hardware_version_rolling = true,
             .software_midstates = 0,
             .asic_initialized = true,
@@ -525,7 +525,7 @@ TEST_CASE("job task fixture rejects oversized extranonce work",
 
     TEST_ASSERT_EQUAL_UINT32(0, result.job_count);
     TEST_ASSERT_EQUAL_UINT32(1, result.coinbase_decode_count);
-    job_pipeline_fixture_result_free(&result);
+    job_pipeline_harness_result_free(&result);
 }
 
 static miner_job_t *prepare_followup_job(uint8_t extranonce_len, bool large_coinbase)
@@ -556,12 +556,12 @@ TEST_CASE("job task preserves maximum accepted metadata and detached ownership",
     memcpy(job->job_id, job_id, 32);
     job->pool_id = UINT8_MAX;
     job->pool_diff = 256.125;
-    const job_pipeline_fixture_event_t events[] = {
-        { .type = JOB_PIPELINE_FIXTURE_NOTIFY, .slot = 0 },
-        { .type = JOB_PIPELINE_FIXTURE_TIMEOUT },
+    const job_pipeline_harness_event_t events[] = {
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 0 },
+        { .type = JOB_PIPELINE_HARNESS_TIMEOUT },
     };
-    job_pipeline_fixture_result_t result;
-    job_pipeline_fixture_run((job_pipeline_fixture_config_t) {
+    job_pipeline_harness_result_t result;
+    job_pipeline_harness_run((job_pipeline_harness_config_t) {
         .hardware_version_rolling = true,
         .asic_initialized = true,
         .job_frequency_ms = 1,
@@ -583,20 +583,20 @@ TEST_CASE("job task preserves maximum accepted metadata and detached ownership",
     TEST_ASSERT_EQUAL_DOUBLE(256.125, result.jobs[0]->pool_diff);
     assert_hex32("e7154b58fec3d73f1e4b8a80535df7bd7e4e0a98228be8375762ed1f77eb40de",
                  result.jobs[0]->merkle_root);
-    job_pipeline_fixture_result_free(&result);
+    job_pipeline_harness_result_free(&result);
 }
 
 TEST_CASE("job allocation failure skips a send and permits the next cycle",
           "[mining][job-building][job-task]")
 {
     (void)prepare_followup_job(1, false);
-    const job_pipeline_fixture_event_t events[] = {
-        { .type = JOB_PIPELINE_FIXTURE_NOTIFY, .slot = 0 },
-        { .type = JOB_PIPELINE_FIXTURE_TIMEOUT },
+    const job_pipeline_harness_event_t events[] = {
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 0 },
+        { .type = JOB_PIPELINE_HARNESS_TIMEOUT },
     };
-    job_pipeline_fixture_result_t result;
-    job_pipeline_fixture_run(
-        (job_pipeline_fixture_config_t) {
+    job_pipeline_harness_result_t result;
+    job_pipeline_harness_run(
+        (job_pipeline_harness_config_t) {
             .hardware_version_rolling = true,
             .asic_initialized = true,
             .job_frequency_ms = 1,
@@ -611,21 +611,21 @@ TEST_CASE("job allocation failure skips a send and permits the next cycle",
     TEST_ASSERT_EQUAL_STRING("01", result.jobs[0]->extranonce2);
     assert_hex32("c528516952ea823ab4cd034973550175c63ebf0f49cb126ccee58049a3fc487c",
                  result.jobs[0]->merkle_root);
-    job_pipeline_fixture_result_free(&result);
+    job_pipeline_harness_result_free(&result);
 }
 
 TEST_CASE("zero-length extranonce waits for new work and preserves owned metadata",
           "[mining][job-building][job-task]")
 {
     miner_job_t *job = prepare_followup_job(0, false);
-    const job_pipeline_fixture_event_t events[] = {
-        { .type = JOB_PIPELINE_FIXTURE_NOTIFY, .slot = 0 },
-        { .type = JOB_PIPELINE_FIXTURE_TIMEOUT },
-        { .type = JOB_PIPELINE_FIXTURE_NOTIFY, .slot = 0 },
+    const job_pipeline_harness_event_t events[] = {
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 0 },
+        { .type = JOB_PIPELINE_HARNESS_TIMEOUT },
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 0 },
     };
-    job_pipeline_fixture_result_t result;
-    job_pipeline_fixture_run(
-        (job_pipeline_fixture_config_t) {
+    job_pipeline_harness_result_t result;
+    job_pipeline_harness_run(
+        (job_pipeline_harness_config_t) {
             .hardware_version_rolling = true,
             .asic_initialized = true,
             .job_frequency_ms = 1,
@@ -645,20 +645,20 @@ TEST_CASE("zero-length extranonce waits for new work and preserves owned metadat
         assert_hex32("3a649bdbf2ac5b0eb5b71ca2aa5cd632c378b2e83dcd84c2d915d25176a56ace",
                      result.jobs[i]->merkle_root);
     }
-    job_pipeline_fixture_result_free(&result);
+    job_pipeline_harness_result_free(&result);
 }
 
 TEST_CASE("large coinbase job uses heap hashing and retains extranonce order",
           "[mining][job-building][job-task]")
 {
     (void)prepare_followup_job(1, true);
-    const job_pipeline_fixture_event_t events[] = {
-        { .type = JOB_PIPELINE_FIXTURE_NOTIFY, .slot = 0 },
-        { .type = JOB_PIPELINE_FIXTURE_TIMEOUT },
+    const job_pipeline_harness_event_t events[] = {
+        { .type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 0 },
+        { .type = JOB_PIPELINE_HARNESS_TIMEOUT },
     };
-    job_pipeline_fixture_result_t result;
-    job_pipeline_fixture_run(
-        (job_pipeline_fixture_config_t) {
+    job_pipeline_harness_result_t result;
+    job_pipeline_harness_run(
+        (job_pipeline_harness_config_t) {
             .hardware_version_rolling = true,
             .asic_initialized = true,
             .job_frequency_ms = 1,
@@ -673,5 +673,5 @@ TEST_CASE("large coinbase job uses heap hashing and retains extranonce order",
                  result.jobs[0]->merkle_root);
     assert_hex32("81d3867d9d36bed64c0a3ecdae4792715cb93cd46f02f9dc3720d004b2850a23",
                  result.jobs[1]->merkle_root);
-    job_pipeline_fixture_result_free(&result);
+    job_pipeline_harness_result_free(&result);
 }

@@ -1,4 +1,4 @@
-#include "result_fixture_bindings.h"
+#include "result_task_test_bindings.h"
 
 #include "asic.h"
 #include "asic_common.h"
@@ -46,14 +46,14 @@ static unsigned fixture_registers;
 static char fixture_scored_id[32];
 static char fixture_submitted_id[32];
 
-void fixture_result_delay(TickType_t ticks)
+void result_task_spy_delay(TickType_t ticks)
 {
     TEST_ASSERT_EQUAL_UINT32(pdMS_TO_TICKS(100), ticks);
     fixture_delays++;
     fixture_state.ASIC_initalized = true;
 }
 
-task_result *ASIC_process_work(GlobalState *state)
+task_result *result_task_fake_process_work(GlobalState *state)
 {
     TEST_ASSERT_EQUAL_PTR(&fixture_state, state);
     if (fixture_event_index++ == 0) {
@@ -68,9 +68,9 @@ task_result *ASIC_process_work(GlobalState *state)
     longjmp(fixture_done, 1);
 }
 
-int stratum_submit_share(GlobalState *state, const bm_job *job,
-                         uint32_t nonce, uint32_t version,
-                         uint64_t *sent_time)
+int result_task_fake_submit_share(GlobalState *state, const bm_job *job,
+                                  uint32_t nonce, uint32_t version,
+                                  uint64_t *sent_time)
 {
     TEST_ASSERT_EQUAL_PTR(&fixture_state, state);
     TEST_ASSERT_EQUAL_HEX32(7, nonce);
@@ -96,15 +96,15 @@ int stratum_submit_share(GlobalState *state, const bm_job *job,
     return fixture_case.submit_result;
 }
 
-void self_test_record_nonce(GlobalState *state, double difficulty)
+void result_task_spy_record_nonce(GlobalState *state, double difficulty)
 {
     TEST_ASSERT_EQUAL_PTR(&fixture_state, state);
     TEST_ASSERT_TRUE(difficulty > 0);
     fixture_self_tests++;
 }
 
-void SYSTEM_notify_found_nonce(GlobalState *state, double difficulty,
-                               uint32_t target)
+void result_task_spy_notify_found_nonce(GlobalState *state, double difficulty,
+                                        uint32_t target)
 {
     TEST_ASSERT_EQUAL_PTR(&fixture_state, state);
     TEST_ASSERT_TRUE(difficulty > 0);
@@ -112,10 +112,10 @@ void SYSTEM_notify_found_nonce(GlobalState *state, double difficulty,
     fixture_notifications++;
 }
 
-esp_err_t scoreboard_add(Scoreboard *scoreboard, double difficulty,
-                         const char *job_id, const char *extranonce,
-                         uint32_t ntime, uint32_t nonce,
-                         uint32_t version_bits)
+esp_err_t result_task_spy_scoreboard_add(
+    Scoreboard *scoreboard, double difficulty, const char *job_id,
+    const char *extranonce, uint32_t ntime, uint32_t nonce,
+    uint32_t version_bits)
 {
     TEST_ASSERT_EQUAL_PTR(&fixture_state.SYSTEM_MODULE.scoreboard, scoreboard);
     TEST_ASSERT_TRUE(difficulty > 0);
@@ -128,9 +128,9 @@ esp_err_t scoreboard_add(Scoreboard *scoreboard, double difficulty,
     return ESP_OK;
 }
 
-void hashrate_monitor_register_read(void *state, register_type_t type,
-                                    uint8_t asic_nr, uint32_t value,
-                                    uint64_t timestamp)
+void result_task_spy_register_read(void *state, register_type_t type,
+                                   uint8_t asic_nr, uint32_t value,
+                                   uint64_t timestamp)
 {
     TEST_ASSERT_EQUAL_PTR(&fixture_state, state);
     TEST_ASSERT_EQUAL(REGISTER_TOTAL_COUNT, type);

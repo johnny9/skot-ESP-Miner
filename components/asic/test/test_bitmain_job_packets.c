@@ -1,7 +1,7 @@
 #include "unity.h"
 
-#include "bm13xx_fixture.h"
-#include "bm1397_fixture.h"
+#include "bm13xx_test_harness.h"
+#include "bm1397_test_harness.h"
 #include "mining.h"
 
 #include <stdlib.h>
@@ -37,12 +37,12 @@ static bm_job *make_job(void)
 static void queue_bm1397_job_response(uint8_t job_id, uint8_t midstate_index,
                                       uint32_t nonce)
 {
-    uint8_t response[BM1397_FIXTURE_RESPONSE_SIZE] = {
+    uint8_t response[BM1397_HARNESS_RESPONSE_SIZE] = {
         0xaa, 0x55, 0, 0, 0, 0, 0,
         (uint8_t)(job_id | midstate_index), 0x80,
     };
     memcpy(response + 2, &nonce, sizeof(nonce));
-    bm1397_fixture_queue_response(response);
+    bm1397_harness_queue_response(response);
 }
 
 TEST_CASE("BM13xx work packets preserve complete header fields byte exact",
@@ -73,15 +73,15 @@ TEST_CASE("BM13xx work packets preserve complete header fields byte exact",
         {0x18, 0x05, 0xd4},
     };
 
-    for (size_t index = 0; index < BM13XX_FIXTURE_DRIVER_COUNT; ++index) {
-        const bm13xx_fixture_driver_t *driver = &bm13xx_fixture_drivers[index];
-        GlobalState *state = bm13xx_fixture_begin();
+    for (size_t index = 0; index < BM13XX_HARNESS_DRIVER_COUNT; ++index) {
+        const bm13xx_harness_driver_t *driver = &bm13xx_harness_drivers[index];
+        GlobalState *state = bm13xx_harness_begin();
         bm_job *job = make_job();
         driver->send_work(state, job);
 
-        TEST_ASSERT_EQUAL_UINT32_MESSAGE(1, bm13xx_fixture_packet_count(),
+        TEST_ASSERT_EQUAL_UINT32_MESSAGE(1, bm13xx_harness_packet_count(),
                                          driver->name);
-        const bm13xx_fixture_packet_t *packet = bm13xx_fixture_packet(0);
+        const bm13xx_harness_packet_t *packet = bm13xx_harness_packet(0);
         uint8_t expected_packet[sizeof(expected_template)];
         memcpy(expected_packet, expected_template, sizeof(expected_packet));
         expected_packet[4] = expected[index].job_id;
@@ -92,8 +92,8 @@ TEST_CASE("BM13xx work packets preserve complete header fields byte exact",
         TEST_ASSERT_EQUAL_HEX8_ARRAY_MESSAGE(expected_packet, packet->bytes,
                                              sizeof(expected_packet), driver->name);
         TEST_ASSERT_EQUAL_PTR(job,
-                              bm13xx_fixture_active_job(expected[index].job_id));
-        bm13xx_fixture_end();
+                              bm13xx_harness_active_job(expected[index].job_id));
+        bm13xx_harness_end();
     }
 }
 
@@ -126,30 +126,30 @@ TEST_CASE("BM1397 work packet and returned midstate preserve version mapping",
         0x20000004, 0x20002004, 0x20004004, 0x20006004,
     };
 
-    GlobalState *state = bm1397_fixture_begin();
-    TEST_ASSERT_EQUAL_UINT8(2, bm1397_fixture_driver.init(state));
-    bm1397_fixture_clear_packets();
+    GlobalState *state = bm1397_harness_begin();
+    TEST_ASSERT_EQUAL_UINT8(2, bm1397_harness_driver.init(state));
+    bm1397_harness_clear_packets();
     bm_job *job = make_job();
-    bm1397_fixture_driver.send_work(state, job);
+    bm1397_harness_driver.send_work(state, job);
 
-    TEST_ASSERT_EQUAL_UINT32(1, bm1397_fixture_packet_count());
-    const bm1397_fixture_packet_t *packet = bm1397_fixture_packet(0);
+    TEST_ASSERT_EQUAL_UINT32(1, bm1397_harness_packet_count());
+    const bm1397_harness_packet_t *packet = bm1397_harness_packet(0);
     TEST_ASSERT_EQUAL_UINT32(sizeof(expected_packet), packet->length);
     TEST_ASSERT_EQUAL_HEX8_ARRAY(expected_packet, packet->bytes,
                                  sizeof(expected_packet));
-    TEST_ASSERT_EQUAL_PTR(job, bm1397_fixture_active_job(4));
+    TEST_ASSERT_EQUAL_PTR(job, bm1397_harness_active_job(4));
 
     for (uint8_t index = 0; index < 4; ++index) {
         uint32_t nonce = 0x0a4c049b + index;
         queue_bm1397_job_response(4, index, nonce);
-        const task_result *result = bm1397_fixture_driver.process_work(state);
+        const task_result *result = bm1397_harness_driver.process_work(state);
         TEST_ASSERT_NOT_NULL(result);
         TEST_ASSERT_EQUAL_HEX8(4, result->job_id);
         TEST_ASSERT_EQUAL_HEX32(nonce, result->nonce);
         TEST_ASSERT_EQUAL_HEX32(expected_versions[index], result->rolled_version);
         TEST_ASSERT_TRUE(result->timestamp_us == UINT64_C(123456789));
     }
-    bm1397_fixture_end();
+    bm1397_harness_end();
 }
 
 TEST_CASE("Bitmain occupied work slots transfer ownership to replacements",
@@ -157,55 +157,55 @@ TEST_CASE("Bitmain occupied work slots transfer ownership to replacements",
 {
     static const uint8_t job_id_steps[] = {8, 24, 24, 24};
 
-    for (size_t index = 0; index < BM13XX_FIXTURE_DRIVER_COUNT; ++index) {
-        const bm13xx_fixture_driver_t *driver = &bm13xx_fixture_drivers[index];
-        GlobalState *state = bm13xx_fixture_begin();
+    for (size_t index = 0; index < BM13XX_HARNESS_DRIVER_COUNT; ++index) {
+        const bm13xx_harness_driver_t *driver = &bm13xx_harness_drivers[index];
+        GlobalState *state = bm13xx_harness_begin();
         bm_job *first = make_job();
         driver->send_work(state, first);
-        uint8_t first_id = bm13xx_fixture_packet(0)->bytes[4];
+        uint8_t first_id = bm13xx_harness_packet(0)->bytes[4];
         uint8_t replacement_id =
             (uint8_t)((first_id + job_id_steps[index]) % 128);
-        bm13xx_fixture_install_job(replacement_id, make_job());
+        bm13xx_harness_install_job(replacement_id, make_job());
 
         bm_job *replacement = make_job();
         driver->send_work(state, replacement);
 
         TEST_ASSERT_EQUAL_HEX8_MESSAGE(
-            replacement_id, bm13xx_fixture_packet(1)->bytes[4], driver->name);
+            replacement_id, bm13xx_harness_packet(1)->bytes[4], driver->name);
         TEST_ASSERT_EQUAL_PTR_MESSAGE(
-            replacement, bm13xx_fixture_active_job(replacement_id), driver->name);
-        bm13xx_fixture_end();
+            replacement, bm13xx_harness_active_job(replacement_id), driver->name);
+        bm13xx_harness_end();
     }
 
-    GlobalState *state = bm1397_fixture_begin();
-    TEST_ASSERT_EQUAL_UINT8(2, bm1397_fixture_driver.init(state));
-    bm1397_fixture_clear_packets();
+    GlobalState *state = bm1397_harness_begin();
+    TEST_ASSERT_EQUAL_UINT8(2, bm1397_harness_driver.init(state));
+    bm1397_harness_clear_packets();
     bm_job *first = make_job();
-    bm1397_fixture_driver.send_work(state, first);
-    uint8_t first_id = bm1397_fixture_packet(0)->bytes[4];
+    bm1397_harness_driver.send_work(state, first);
+    uint8_t first_id = bm1397_harness_packet(0)->bytes[4];
     uint8_t replacement_id = (uint8_t)((first_id + 4) % 128);
-    bm1397_fixture_install_job(replacement_id, make_job());
+    bm1397_harness_install_job(replacement_id, make_job());
 
     bm_job *replacement = make_job();
-    bm1397_fixture_driver.send_work(state, replacement);
+    bm1397_harness_driver.send_work(state, replacement);
 
-    TEST_ASSERT_EQUAL_HEX8(replacement_id, bm1397_fixture_packet(1)->bytes[4]);
+    TEST_ASSERT_EQUAL_HEX8(replacement_id, bm1397_harness_packet(1)->bytes[4]);
     TEST_ASSERT_EQUAL_PTR(
-        replacement, bm1397_fixture_active_job(replacement_id));
-    bm1397_fixture_end();
+        replacement, bm1397_harness_active_job(replacement_id));
+    bm1397_harness_end();
 }
 
 TEST_CASE("BM1397 register results preserve type address value and reset job fields",
           "[asic][result][register][characterization]")
 {
-    GlobalState *state = bm1397_fixture_begin();
-    TEST_ASSERT_EQUAL_UINT8(2, bm1397_fixture_driver.init(state));
+    GlobalState *state = bm1397_harness_begin();
+    TEST_ASSERT_EQUAL_UINT8(2, bm1397_harness_driver.init(state));
 
-    const uint8_t register_response[BM1397_FIXTURE_RESPONSE_SIZE] = {
+    const uint8_t register_response[BM1397_HARNESS_RESPONSE_SIZE] = {
         0xaa, 0x55, 0x12, 0x34, 0x56, 0x78, 0x80, 0x4c, 0x00,
     };
-    bm1397_fixture_queue_response(register_response);
-    const task_result *result = bm1397_fixture_driver.process_work(state);
+    bm1397_harness_queue_response(register_response);
+    const task_result *result = bm1397_harness_driver.process_work(state);
 
     TEST_ASSERT_NOT_NULL(result);
     TEST_ASSERT_EQUAL_INT(REGISTER_ERROR_COUNT, result->register_type);
@@ -216,40 +216,40 @@ TEST_CASE("BM1397 register results preserve type address value and reset job fie
     TEST_ASSERT_EQUAL_HEX32(0, result->rolled_version);
     TEST_ASSERT_TRUE(result->timestamp_us == UINT64_C(123456789));
 
-    const uint8_t unknown_register[BM1397_FIXTURE_RESPONSE_SIZE] = {
+    const uint8_t unknown_register[BM1397_HARNESS_RESPONSE_SIZE] = {
         0xaa, 0x55, 0, 0, 0, 0, 0, 0x01, 0x00,
     };
-    bm1397_fixture_queue_response(unknown_register);
-    TEST_ASSERT_NULL(bm1397_fixture_driver.process_work(state));
-    bm1397_fixture_end();
+    bm1397_harness_queue_response(unknown_register);
+    TEST_ASSERT_NULL(bm1397_harness_driver.process_work(state));
+    bm1397_harness_end();
 }
 
 TEST_CASE("BM1397 rejects inactive job results and repeated nonces",
           "[asic][result][job-store][characterization]")
 {
-    GlobalState *state = bm1397_fixture_begin();
-    TEST_ASSERT_EQUAL_UINT8(2, bm1397_fixture_driver.init(state));
-    bm1397_fixture_clear_packets();
+    GlobalState *state = bm1397_harness_begin();
+    TEST_ASSERT_EQUAL_UINT8(2, bm1397_harness_driver.init(state));
+    bm1397_harness_clear_packets();
 
-    TEST_ASSERT_NULL(bm1397_fixture_driver.process_work(state));
+    TEST_ASSERT_NULL(bm1397_harness_driver.process_work(state));
     queue_bm1397_job_response(0x7c, 0, 0x13579bdf);
-    TEST_ASSERT_NULL(bm1397_fixture_driver.process_work(state));
-    bm1397_fixture_mark_job_valid(0x78);
+    TEST_ASSERT_NULL(bm1397_harness_driver.process_work(state));
+    bm1397_harness_mark_job_valid(0x78);
     queue_bm1397_job_response(0x78, 0, 0x13579be0);
-    TEST_ASSERT_NULL(bm1397_fixture_driver.process_work(state));
+    TEST_ASSERT_NULL(bm1397_harness_driver.process_work(state));
 
     bm_job *job = make_job();
-    bm1397_fixture_driver.send_work(state, job);
-    uint8_t job_id = bm1397_fixture_packet(0)->bytes[4];
+    bm1397_harness_driver.send_work(state, job);
+    uint8_t job_id = bm1397_harness_packet(0)->bytes[4];
     uint32_t nonce = 0x2468ace1;
     queue_bm1397_job_response(job_id, 2, nonce);
-    const task_result *result = bm1397_fixture_driver.process_work(state);
+    const task_result *result = bm1397_harness_driver.process_work(state);
     TEST_ASSERT_NOT_NULL(result);
     TEST_ASSERT_EQUAL_HEX8(job_id, result->job_id);
     TEST_ASSERT_EQUAL_HEX32(nonce, result->nonce);
     TEST_ASSERT_EQUAL_HEX32(0x20004004, result->rolled_version);
 
     queue_bm1397_job_response(job_id, 2, nonce);
-    TEST_ASSERT_NULL(bm1397_fixture_driver.process_work(state));
-    bm1397_fixture_end();
+    TEST_ASSERT_NULL(bm1397_harness_driver.process_work(state));
+    bm1397_harness_end();
 }

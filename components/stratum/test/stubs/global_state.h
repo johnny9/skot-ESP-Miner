@@ -1,5 +1,5 @@
-#ifndef TEST_FIXTURE_GLOBAL_STATE_H
-#define TEST_FIXTURE_GLOBAL_STATE_H
+#ifndef TEST_STUB_GLOBAL_STATE_H
+#define TEST_STUB_GLOBAL_STATE_H
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -47,4 +47,4 @@ typedef struct GlobalState {
     } SELF_TEST_MODULE;
 } GlobalState;
 
-#endif /* TEST_FIXTURE_GLOBAL_STATE_H */
+#endif /* TEST_STUB_GLOBAL_STATE_H */

@@ -25,6 +25,7 @@ typedef struct {
     bool replace_during_submit;
     unsigned repeated_results;
     double pool_diff;
+    int submit_result;
     uint64_t sent_time;
     miner_job_type_t protocol;
 } result_case_t;
@@ -92,7 +93,7 @@ int stratum_submit_share(GlobalState *state, const bm_job *job,
             &fixture_state.ASIC_TASK_MODULE.valid_jobs_lock);
     }
     *sent_time = fixture_case.sent_time;
-    return 0;
+    return fixture_case.submit_result;
 }
 
 void self_test_record_nonce(GlobalState *state, double difficulty)
@@ -261,6 +262,16 @@ TEST_CASE("result task preserves thresholds self test and repeated delivery",
         TEST_ASSERT_EQUAL_UINT32(1, fixture_scores);
         TEST_ASSERT_EQUAL_UINT32(1, fixture_notifications);
     }
+
+    run_result_case((result_case_t) {
+        .pool_diff = 1e-30,
+        .submit_result = -1,
+        .sent_time = 2000,
+    });
+    TEST_ASSERT_EQUAL_UINT32(1, fixture_submissions);
+    TEST_ASSERT_EQUAL_UINT32(1, fixture_scores);
+    TEST_ASSERT_EQUAL_UINT32(1, fixture_notifications);
+    TEST_ASSERT_EQUAL_FLOAT(0, fixture_state.SYSTEM_MODULE.process_time);
 
     run_result_case((result_case_t) {
         .pool_diff = 1e-30,

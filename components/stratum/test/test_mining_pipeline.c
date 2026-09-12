@@ -548,6 +548,44 @@ static miner_job_t *prepare_followup_job(uint8_t extranonce_len, bool large_coin
     return job;
 }
 
+TEST_CASE("job task preserves maximum accepted metadata and detached ownership",
+          "[mining][job-building][job-task]")
+{
+    miner_job_t *job = prepare_followup_job(32, false);
+    const char *job_id = "0123456789012345678901234567890";
+    memcpy(job->job_id, job_id, 32);
+    job->pool_id = UINT8_MAX;
+    job->pool_diff = 256.125;
+    const job_pipeline_fixture_event_t events[] = {
+        { .type = JOB_PIPELINE_FIXTURE_NOTIFY, .slot = 0 },
+        { .type = JOB_PIPELINE_FIXTURE_TIMEOUT },
+    };
+    job_pipeline_fixture_result_t result;
+    job_pipeline_fixture_run((job_pipeline_fixture_config_t) {
+        .hardware_version_rolling = true,
+        .asic_initialized = true,
+        .job_frequency_ms = 1,
+    }, events, sizeof(events) / sizeof(events[0]), &result);
+
+    TEST_ASSERT_EQUAL_UINT32(2, result.job_count);
+    memset(job->job_id, 'x', sizeof(job->job_id));
+    memset(job->coinbase_prefix, 0, job->coinbase_prefix_len);
+    memset(job->coinbase_suffix, 0, job->coinbase_suffix_len);
+    TEST_ASSERT_EQUAL_STRING(job_id, result.jobs[0]->jobid);
+    TEST_ASSERT_EQUAL_STRING(job_id, result.jobs[1]->jobid);
+    TEST_ASSERT_EQUAL_STRING(
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        result.jobs[0]->extranonce2);
+    TEST_ASSERT_EQUAL_STRING(
+        "0100000000000000000000000000000000000000000000000000000000000000",
+        result.jobs[1]->extranonce2);
+    TEST_ASSERT_EQUAL_UINT8(UINT8_MAX, result.jobs[0]->pool_id);
+    TEST_ASSERT_EQUAL_DOUBLE(256.125, result.jobs[0]->pool_diff);
+    assert_hex32("e7154b58fec3d73f1e4b8a80535df7bd7e4e0a98228be8375762ed1f77eb40de",
+                 result.jobs[0]->merkle_root);
+    job_pipeline_fixture_result_free(&result);
+}
+
 TEST_CASE("job allocation failure skips a send and permits the next cycle",
           "[mining][job-building][job-task]")
 {

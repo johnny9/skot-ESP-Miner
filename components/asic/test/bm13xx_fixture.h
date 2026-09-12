@@ -7,12 +7,14 @@
 #include "asic_common.h"
 
 typedef struct GlobalState GlobalState;
+typedef struct bm_job bm_job;
 
 enum { BM13XX_FIXTURE_DRIVER_COUNT = 4, BM13XX_FIXTURE_RESPONSE_SIZE = 11 };
 
 typedef struct {
     const char *name;
     uint8_t (*init)(GlobalState *state);
+    void (*send_work)(GlobalState *state, bm_job *job);
     void (*set_version_mask)(uint32_t mask);
     task_result *(*process_work)(GlobalState *state);
     uint8_t response_job_id;
@@ -32,6 +34,7 @@ void bm13xx_fixture_end(void);
 void bm13xx_fixture_clear_packets(void);
 size_t bm13xx_fixture_packet_count(void);
 const bm13xx_fixture_packet_t *bm13xx_fixture_packet(size_t index);
+bm_job *bm13xx_fixture_active_job(uint8_t job_id);
 void bm13xx_fixture_fail_writes(unsigned count);
 unsigned bm13xx_fixture_delay_count(void);
 void bm13xx_fixture_set_job(uint32_t version, bool valid, bool present);

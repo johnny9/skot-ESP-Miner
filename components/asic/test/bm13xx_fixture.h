@@ -35,6 +35,7 @@ void bm13xx_fixture_clear_packets(void);
 size_t bm13xx_fixture_packet_count(void);
 const bm13xx_fixture_packet_t *bm13xx_fixture_packet(size_t index);
 bm_job *bm13xx_fixture_active_job(uint8_t job_id);
+void bm13xx_fixture_install_job(uint8_t job_id, bm_job *job);
 void bm13xx_fixture_fail_writes(unsigned count);
 unsigned bm13xx_fixture_delay_count(void);
 void bm13xx_fixture_set_job(uint32_t version, bool valid, bool present);

@@ -81,6 +81,14 @@ bm_job *bm1397_fixture_active_job(uint8_t job_id)
     return active_jobs[job_id];
 }
 
+void bm1397_fixture_install_job(uint8_t job_id, bm_job *job)
+{
+    TEST_ASSERT_TRUE(job_id < JOB_SLOTS);
+    TEST_ASSERT_NULL(active_jobs[job_id]);
+    active_jobs[job_id] = job;
+    valid_jobs[job_id] = 1;
+}
+
 void bm1397_fixture_queue_response(
     const uint8_t response[BM1397_FIXTURE_RESPONSE_SIZE])
 {

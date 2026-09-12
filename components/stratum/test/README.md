@@ -3,6 +3,13 @@
 These modules test how pool jobs become ASIC jobs. They use the real mining and
 job-task code with controlled inputs and recorded outputs.
 
+## Test levels
+
+- A **unit test** checks one function or a small module with direct inputs and
+  outputs.
+- A **component test** runs a task with the related job and mining code. Test
+  doubles replace task scheduling, hardware, and other external boundaries.
+
 ## How the modules fit together
 
 1. A test case creates a miner job or a list of task events.
@@ -22,20 +29,20 @@ job-task code with controlled inputs and recorded outputs.
 | `mining_allocator_fault_injector.*` | Fails one selected allocation and records allocation calls. A test can then check error handling and recovery. |
 | `stubs/` | Provides small replacement headers with only the platform types and state needed by these tests. |
 
-## Tests that use these support modules
+## Component tests
 
-| File | Main coverage |
+| File | Production components and behavior |
 | --- | --- |
-| `test_job_building.c` | Coinbase hashing at stack and heap limits, allocation failure recovery, ASIC job defaults, copied metadata, and software midstates. |
-| `test_mining_pipeline.c` | SV1 and SV2 job conversion, exact ASIC job data, idle and staged task events, invalid and maximum metadata, job ownership, allocation recovery, empty extranonce data, and large coinbase data. |
+| `test_mining_pipeline.c` | Runs the SV1 and SV2 job models, mining conversion, and create-jobs task together. It checks exact ASIC job data, task events, metadata limits, job ownership, allocation recovery, extranonce data, and large coinbase data. |
 
-## Other tests in this directory
+## Unit tests
 
-| File | Main coverage |
+| File | Unit behavior |
 | --- | --- |
 | `test_base58.c` | Base58 P2PKH and P2SH address encoding, including a small output buffer. |
 | `test_bech32.c` | Bech32 and Bech32m address encoding for several witness types and networks, including invalid inputs. |
 | `test_coinbase_decoder.c` | Varint bounds, payout address decoding, network formats, BIP-110 signaling, job input, and transaction locktime checks. |
+| `test_job_building.c` | Coinbase hashing at stack and heap limits, allocation failure recovery, ASIC job defaults, copied metadata, and software midstates. |
 | `test_miner_job.c` | Miner-job pool slots, buffer ownership, index wraparound, and rollable-job checks. |
 | `test_mining.c` | Coinbase hashes, Merkle roots, midstates, version-mask changes, and nonce difficulty. |
 | `test_stratum_json.c` | SV1 JSON-RPC parsing, job fields, server messages, malformed input, line buffering, and size limits. |

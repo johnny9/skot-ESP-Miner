@@ -3,6 +3,13 @@
 These modules test job packets, ASIC responses, and result handling while using
 the real production code.
 
+## Test levels
+
+- A **unit test** checks one function or a small module with direct inputs and
+  outputs.
+- A **component test** runs a driver or task with its related production code.
+  Test doubles replace external hardware, timing, and service boundaries.
+
 ## How the modules fit together
 
 1. A test case calls a test harness or a test task.
@@ -28,20 +35,25 @@ logic under test is unchanged.
 | `result_task_test_bindings.h` | Gives the result task a private test name. It connects ASIC results, share submission, scoring, self-test, and register calls to test doubles. |
 | `result_task_test_instance.c` | Builds an isolated instance of the real ASIC result task. |
 
-## Tests that use these support modules
+## Component tests
 
-| File | Main coverage |
+| File | Production components and behavior |
 | --- | --- |
-| `test_bitmain_job_packets.c` | Work packet fields, work-slot replacement, share responses, register responses, inactive jobs, and repeated nonces. |
-| `test_version_rolling.c` | Version-mask commands, driver setup, rolled-version results, write retries, missing jobs, register responses, and submitted share fields. |
-| `test_asic_result_task.c` | Result processing, owned job snapshots, all job protocols, register routing, unavailable slots, share thresholds, self-test results, and repeated results. |
+| `test_bitmain_job_packets.c` | Runs the BM13xx and BM1397 drivers with the active-job store. It checks work packets, slot replacement, share and register responses, inactive jobs, and repeated nonces. |
+| `test_version_rolling.c` | Runs the BM13xx drivers, active-job store, and SV1 and SV2 share encoders. It checks version-mask commands, driver setup, response decoding, write retries, and submitted version fields. |
+| `test_asic_result_task.c` | Runs the ASIC result task with the active-job store and mining checks. It checks owned job snapshots, all job protocols, register routing, unavailable slots, share thresholds, self-test results, and repeated results. |
 
-## Other tests in this directory
+## Unit tests
 
-| File | Main coverage |
+| File | Unit behavior |
 | --- | --- |
 | `test_pll.c` | PLL divider selection and the calculated ASIC frequency. |
 | `test_timeout.c` | ASIC timeout calculation for different chips, chain sizes, version spaces, and the zero-chip default. |
+
+## Disabled example
+
+| File | Purpose |
+| --- | --- |
 | `test_job_command.c` | A disabled hardware example for sending a BM1397 job and reading its result. It does not contain an active test. |
 
 ## Test double names

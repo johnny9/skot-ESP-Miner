@@ -78,10 +78,12 @@ add_executable(
     ../components/stratum/test/job_pipeline_fixture.c
     ../components/stratum/test/mining_allocator_fixture.c
     ../components/asic/test/bm13xx_fixture.c
+    ../components/asic/test/bm1397_fixture.c
     ../components/asic/bm1366.c
     ../components/asic/bm1368.c
     ../components/asic/bm1370.c
     ../components/asic/bm1373.c
+    ../components/asic/bm1397.c
     ../components/stratum/stratum_protocol.c
     ../components/stratum/sv1_protocol.c
     ../components/stratum/miner_job.c
@@ -134,10 +136,22 @@ set_source_files_properties(
         "-include;${CMAKE_CURRENT_SOURCE_DIR}/../components/asic/test/bm13xx_fixture_bindings.h"
 )
 
+set_source_files_properties(
+    ../components/asic/bm1397.c
+    PROPERTIES COMPILE_OPTIONS
+        "-include;${CMAKE_CURRENT_SOURCE_DIR}/../components/asic/test/bm1397_fixture_bindings.h"
+)
+
 # BM1368's existing initialization loops compare int indices with sizeof.
 # Keep that cleanup for a production follow-up, not this characterization work.
 set_property(SOURCE ../components/asic/bm1368.c APPEND PROPERTY
     COMPILE_OPTIONS -Wno-sign-compare
+)
+
+# BM1397_set_version_mask currently keeps its argument as a placeholder.
+# Leave production cleanup outside this characterization-only change.
+set_property(SOURCE ../components/asic/bm1397.c APPEND PROPERTY
+    COMPILE_OPTIONS -Wno-unused-parameter
 )
 target_compile_definitions(
     esp_miner_host_tests

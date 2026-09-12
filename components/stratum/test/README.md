@@ -22,12 +22,24 @@ job-task code with controlled inputs and recorded outputs.
 | `mining_allocator_fault_injector.*` | Fails one selected allocation and records allocation calls. A test can then check error handling and recovery. |
 | `stubs/` | Provides small replacement headers with only the platform types and state needed by these tests. |
 
-## Coverage files
+## Tests that use these support modules
 
 | File | Main coverage |
 | --- | --- |
 | `test_job_building.c` | Coinbase hashing at stack and heap limits, allocation failure recovery, ASIC job defaults, copied metadata, and software midstates. |
 | `test_mining_pipeline.c` | SV1 and SV2 job conversion, exact ASIC job data, idle and staged task events, invalid and maximum metadata, job ownership, allocation recovery, empty extranonce data, and large coinbase data. |
+
+## Other tests in this directory
+
+| File | Main coverage |
+| --- | --- |
+| `test_base58.c` | Base58 P2PKH and P2SH address encoding, including a small output buffer. |
+| `test_bech32.c` | Bech32 and Bech32m address encoding for several witness types and networks, including invalid inputs. |
+| `test_coinbase_decoder.c` | Varint bounds, payout address decoding, network formats, BIP-110 signaling, job input, and transaction locktime checks. |
+| `test_miner_job.c` | Miner-job pool slots, buffer ownership, index wraparound, and rollable-job checks. |
+| `test_mining.c` | Coinbase hashes, Merkle roots, midstates, version-mask changes, and nonce difficulty. |
+| `test_stratum_json.c` | SV1 JSON-RPC parsing, job fields, server messages, malformed input, line buffering, and size limits. |
+| `test_utils.c` | Hashing, hex conversion, URL decoding, byte order, network difficulty, and difficulty conversion safety. |
 
 ## Test double names
 

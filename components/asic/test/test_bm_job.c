@@ -20,8 +20,10 @@ TEST_CASE("Bitmain conversion matches reference values across rolling modes",
                     .pool_diff = 2048, .pool_id = 3,
                     .job_id = "42", .extranonce2 = "aabb",
                 };
-                memset(source.prev_hash, 0x5a, 32);
-                memset(source.merkle_root, 0x71, 32);
+                for (size_t i = 0; i < 32; ++i) {
+                    source.prev_hash[i] = (uint8_t)i;
+                    source.merkle_root[i] = (uint8_t)(0xff - i);
+                }
                 miner_job_t pool_job = {
                     .type = (miner_job_type_t)type, .version = source.version,
                     .version_mask = source.version_mask, .ntime = source.ntime,

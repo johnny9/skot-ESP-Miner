@@ -10,6 +10,7 @@ SRCS
     "asic_common.c"
     "asic.c"
     "asic_submit.c"
+    "bm_hashrate.c"
     "bm_job.c"
     "bm_job_midstate.c"
     "bm_job_store.c"

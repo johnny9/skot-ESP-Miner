@@ -1,9 +1,9 @@
 # Common ASIC jobs
 
-This change depends on [PR #1969](https://github.com/bitaxeorg/ESP-Miner/pull/1969)
-merging first. The PR branch starts from its head
-`9af07d7c57c38ec3532a2a5ffd1e700a03159003`. It adapts the common-jobs step
-of the refactor plan to that QEMU characterization base.
+This change builds on the QEMU characterization coverage merged in
+[PR #1969](https://github.com/bitaxeorg/ESP-Miner/pull/1969). The PR branch was
+rebased onto `master` at `43e9b97ef6053bec44543fccb91f5d020e69be4d` on
+2026-09-16. It adapts the common-jobs step of the refactor plan to that base.
 
 `asic_job_t` owns the Bitcoin header fields and submission metadata. Hash
 arrays hold header bytes; the header encoder writes integers explicitly in
@@ -92,6 +92,21 @@ submission. Driver capabilities, timestamp-rolling permissions, and wider
 self-test refactoring remain outside this change.
 
 ## Validation
+
+### Rebase onto master (2026-09-16)
+
+- Rebased onto `43e9b97e` after #1969 merged. The six common-job commits
+  replayed without conflicts; the mDNS pin is already present in `master`.
+- Fresh ESP-IDF 6.0.2 / ESP32-S3 QEMU build: **141 tests, 0 failures,
+  0 ignored**.
+- Host hash-byte tests pass under ASan/UBSan with leak checking enabled.
+- Full ESP32-S3 firmware build passes using the existing web UI bundle,
+  with 35% app partition space free. The frontend was unchanged and was not
+  rebuilt for this validation.
+- The mining boundary check and `git diff --check` pass.
+
+Local logs are in `build/rebase-validation/` in the rebase worktree. No physical
+miner was flashed or exercised for this rebase.
 
 ### Review follow-up
 

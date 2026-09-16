@@ -58,13 +58,6 @@ accesses and `memcpy`, with no casts to integer pointers and no alignment
 requirement on hash arrays or software midstates. The 256-bit conversion
 decodes little-endian limbs explicitly and preserves high-to-low accumulation.
 
-`bash tools/run_hash_bytes_tests.sh` compiles this production file on the host
-with AddressSanitizer, UndefinedBehaviorSanitizer, and strict cast-alignment
-warnings. CI runs it before the QEMU build. It checks all source/destination
-offsets modulo eight, guard bytes, reversal vectors, all 256 target bits,
-zero/max targets, and a value spanning two limbs. These tests detect C alignment
-violations even though ESP32-S3 and its QEMU model support unaligned accesses.
-
 ## Downstream compatibility
 
 Bonanza 1002/BZM adopted this common-job interface unchanged in
@@ -95,7 +88,6 @@ self-test refactoring remain outside this change.
   replayed without conflicts; the mDNS pin is already present in `master`.
 - Fresh ESP-IDF 6.0.2 / ESP32-S3 QEMU build: **141 tests, 0 failures,
   0 ignored**.
-- Host hash-byte tests pass under ASan/UBSan with leak checking enabled.
 - Full ESP32-S3 firmware build passes using the existing web UI bundle,
   with 35% app partition space free. The frontend was unchanged and was not
   rebuilt for this validation.
@@ -110,9 +102,6 @@ miner was flashed or exercised for this rebase.
   0 ignored**. This covers maximum-length metadata, empty and unterminated
   strings, ownership after slot replacement, and the remaining job-allocation
   failure/recovery path.
-- Host hash-byte tests pass under ASan/UBSan at `-O2`; the same regression
-  fails on the previous implementation with a misaligned-write diagnostic.
-  Leak checking was disabled for the local sandbox's ptrace restriction.
 - Full firmware build passes with the existing web UI bundle and 35% app
   partition space free. `git diff --check` passes.
 

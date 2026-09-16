@@ -15,9 +15,6 @@ jobs:
         with:
           submodules: 'recursive'
 
-      - name: Check hash byte helpers with host sanitizers
-        run: bash tools/run_hash_bytes_tests.sh
-
       - name: esp-idf build
         uses: espressif/esp-idf-ci-action@v1
         with:

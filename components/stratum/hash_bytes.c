@@ -1,23 +1,55 @@
 #include "utils.h"
 #include <string.h>
 
+static inline void reverse_32bit_words_impl(const uint8_t src[32], uint8_t dest[32])
+{
+    uint32_t source[8];
+    uint32_t reversed[8];
+
+    // Built-in copies let GCC optimize aligned accesses despite ESP-IDF's
+    // -fno-builtin-memcpy, while keeping byte-buffer accesses valid.
+    __builtin_memcpy(source, src, sizeof(source));
+
+    reversed[0] = source[7];
+    reversed[1] = source[6];
+    reversed[2] = source[5];
+    reversed[3] = source[4];
+    reversed[4] = source[3];
+    reversed[5] = source[2];
+    reversed[6] = source[1];
+    reversed[7] = source[0];
+
+    __builtin_memcpy(dest, reversed, sizeof(reversed));
+}
+
 void reverse_32bit_words(const uint8_t src[32], uint8_t dest[32])
 {
-    for (size_t i = 0; i < 8; ++i) {
-        memcpy(dest + i * 4, src + (7 - i) * 4, 4);
+    if ((uintptr_t)src % _Alignof(uint32_t) == 0 &&
+        (uintptr_t)dest % _Alignof(uint32_t) == 0) {
+        reverse_32bit_words_impl(__builtin_assume_aligned(src, _Alignof(uint32_t)),
+                                __builtin_assume_aligned(dest, _Alignof(uint32_t)));
+    } else {
+        reverse_32bit_words_impl(src, dest);
     }
 }
 
 void reverse_endianness_per_word(uint8_t data[32])
 {
-    for (size_t i = 0; i < 32; i += 4) {
-        uint8_t first = data[i];
-        uint8_t second = data[i + 1];
-        data[i] = data[i + 3];
-        data[i + 1] = data[i + 2];
-        data[i + 2] = second;
-        data[i + 3] = first;
-    }
+    uint32_t words[8];
+
+    // Work on aligned words while allowing an unaligned byte buffer.
+    memcpy(words, data, sizeof(words));
+
+    words[0] = __builtin_bswap32(words[0]);
+    words[1] = __builtin_bswap32(words[1]);
+    words[2] = __builtin_bswap32(words[2]);
+    words[3] = __builtin_bswap32(words[3]);
+    words[4] = __builtin_bswap32(words[4]);
+    words[5] = __builtin_bswap32(words[5]);
+    words[6] = __builtin_bswap32(words[6]);
+    words[7] = __builtin_bswap32(words[7]);
+
+    memcpy(data, words, sizeof(words));
 }
 
 static uint64_t load_le64(const uint8_t *data)

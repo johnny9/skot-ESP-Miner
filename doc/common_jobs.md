@@ -52,15 +52,21 @@ of metadata allocations with inline owned strings.
 
 ## Hash byte alignment
 
+`bm_job.midstates` is explicitly aligned with `_Alignas(uint32_t)`, matching
+the alignment fix in [PR #1976](https://github.com/bitaxeorg/ESP-Miner/pull/1976).
+The same PR's byte-reversal helpers operate through aligned temporary words,
+support unaligned buffers, and preserve the source before writing overlapping
+destinations. The common-job layout and Bitmain wire packet layout are unchanged.
+
 `reverse_32bit_words()`, `reverse_endianness_per_word()`, and `le256todouble()`
 operate on byte buffers in `components/stratum/hash_bytes.c`. They use byte
 accesses and `memcpy`, with no casts to integer pointers and no alignment
-requirement on hash arrays or software midstates. The 256-bit conversion
+requirement on their byte-buffer arguments. The 256-bit conversion
 decodes little-endian limbs explicitly and preserves high-to-low accumulation.
 
 The existing Unity/QEMU suite in `components/stratum/test/test_utils.c` checks
-all source/destination offsets modulo eight, fixed reversal vectors, guard
-bytes, source preservation, and byte-reversal round trips. Target conversion
+all source/destination offsets modulo eight, overlapping buffers, fixed reversal
+vectors, guard bytes, source preservation, and byte-reversal round trips. Target conversion
 tests cover all 256 individual bits, zero and maximum targets, and an exactly
 representable value spanning two limbs at every offset. These are ordinary
 correctness tests; they do not require sanitizer instrumentation or a separate
@@ -89,6 +95,17 @@ submission. Driver capabilities, timestamp-rolling permissions, and wider
 self-test refactoring remain outside this change.
 
 ## Validation
+
+### Midstate alignment review (2026-09-16)
+
+- ESP-IDF 6.0.2 / ESP32-S3 QEMU: **144 tests, 0 failures, 0 ignored**,
+  including overlapping-buffer reversal and all buffer alignments.
+- A compile-time assertion checks the midstate field's word alignment.
+- Full firmware build passes with the existing web UI bundle and 35% app
+  partition space free. `git diff --check` passes.
+
+Local logs are in `build/alignment-review-validation/` in the rebase worktree.
+No physical miner was flashed or exercised for this update.
 
 ### Hash-byte unit tests (2026-09-16)
 

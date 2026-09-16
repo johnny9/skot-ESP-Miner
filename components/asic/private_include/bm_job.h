@@ -17,7 +17,7 @@ typedef struct bm_job
     uint32_t starting_nonce;
 
     uint8_t num_midstates;
-    uint8_t midstates[BM_JOB_MAX_MIDSTATES][32];
+    _Alignas(uint32_t) uint8_t midstates[BM_JOB_MAX_MIDSTATES][32];
     double pool_diff;
     uint8_t pool_id;
     mining_job_source_t job_type;

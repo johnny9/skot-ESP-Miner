@@ -128,6 +128,31 @@ TEST_CASE("reverse_32bit_words", "[utils]")
     }
 }
 
+TEST_CASE("word reversal supports overlapping buffers", "[utils]")
+{
+    const uint8_t expected_words[32] = {
+        28, 29, 30, 31, 24, 25, 26, 27, 20, 21, 22, 23, 16, 17, 18, 19,
+        12, 13, 14, 15,  8,  9, 10, 11,  4,  5,  6,  7,  0,  1,  2,  3
+    };
+    const size_t offsets[][2] = {
+        {0, 0}, {0, 4}, {4, 0}, {1, 1}, {1, 5}, {5, 1}, {0, 1}, {1, 0}
+    };
+
+    for (size_t i = 0; i < sizeof(offsets) / sizeof(offsets[0]); i++) {
+        _Alignas(uint32_t) uint8_t storage[48];
+        uint8_t expected[sizeof(storage)];
+        memset(storage, 0xa5, sizeof(storage));
+        uint8_t *source = storage + 4 + offsets[i][0];
+        uint8_t *destination = storage + 4 + offsets[i][1];
+        for (int byte = 0; byte < 32; byte++) source[byte] = byte;
+        memcpy(expected, storage, sizeof(expected));
+        memcpy(expected + 4 + offsets[i][1], expected_words, sizeof(expected_words));
+
+        reverse_32bit_words(source, destination);
+        TEST_ASSERT_EQUAL_UINT8_ARRAY(expected, storage, sizeof(storage));
+    }
+}
+
 TEST_CASE("reverse_endianness_per_word", "[utils]")
 {
     const uint8_t expected[32] = { 3,  2,  1,  0,

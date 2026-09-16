@@ -1,8 +1,12 @@
 #include "unity.h"
 #include "bm_job.h"
 #include "utils.h"
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+
+_Static_assert(offsetof(bm_job, midstates) % _Alignof(uint32_t) == 0,
+               "Bitmain midstates must be word-aligned");
 
 // Values calculated from esp-miner/components/asic/test/verifiers/bm1397.py
 TEST_CASE("Validate midstate generation", "[asic-job][bitmain]")

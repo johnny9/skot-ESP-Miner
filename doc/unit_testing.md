@@ -155,6 +155,13 @@ tests. If repository-owned firmware sources are introduced outside
 `components` or `main`, add the new source root to `tools/run_host_coverage.sh`.
 Generated build outputs remain outside the inventory.
 
+Coverage discovery includes the test object directories because a test instance
+can include a production source with private symbols and injected boundary
+calls. Filter out test bodies and support code by source path, rather than
+discarding these objects and losing their production coverage.
+Merge repeated line and branch coverage across those instances so compiling
+the same production source twice does not count its source lines twice.
+
 The instrumented numerator is also derived, not configured separately. A
 production source registered with the native target in
 `host-tests/CMakeLists.txt` appears as instrumented when gcov produces coverage

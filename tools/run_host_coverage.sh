@@ -47,10 +47,14 @@ mkdir -p "$report_dir"
 # Inventory every repository-owned production source in the two firmware
 # source roots. Do not enumerate first-party modules: new files must enter the
 # denominator automatically. Only copied third-party sources are excluded.
+# Scan test object directories too: test instances include production sources.
+# The source-file exclusion below still omits test bodies and support code.
+# Merge repeated source lines/branches across normal and injected instances.
 gcovr_status=0
 gcovr \
     --root "$project_dir" \
     --object-directory "$build_dir" \
+    --merge-lines \
     --filter "$project_dir/components/" \
     --filter "$project_dir/main/" \
     --include '.*\.(c|cc|cpp|cxx)$' \
@@ -62,7 +66,6 @@ gcovr \
     --exclude '.*/node_modules/.*' \
     --exclude-directory '.*/libsecp256k1($|/)' \
     --exclude-directory '.*/node_modules($|/)' \
-    --exclude-directory '.*/test($|/)' \
     --exclude-directory "$build_dir/_deps($|/)" \
     --txt "$report_dir/coverage.txt" \
     --html-details "$report_dir/index.html" \

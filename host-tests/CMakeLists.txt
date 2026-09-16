@@ -75,6 +75,9 @@ add_executable(
     src/host_platform_stubs.c
     src/esp_log_host.c
     ${host_test_sources}
+    # Share the upstream allocator fault-injection instance with QEMU tests.
+    ../components/stratum/test/mining_test_instance.c
+    ../components/stratum/test/mining_allocator_fault_injector.c
     ../components/stratum/stratum_protocol.c
     ../components/stratum/sv1_protocol.c
     ../components/stratum/miner_job.c

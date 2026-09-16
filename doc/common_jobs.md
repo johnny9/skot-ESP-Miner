@@ -58,6 +58,14 @@ accesses and `memcpy`, with no casts to integer pointers and no alignment
 requirement on hash arrays or software midstates. The 256-bit conversion
 decodes little-endian limbs explicitly and preserves high-to-low accumulation.
 
+The existing Unity/QEMU suite in `components/stratum/test/test_utils.c` checks
+all source/destination offsets modulo eight, fixed reversal vectors, guard
+bytes, source preservation, and byte-reversal round trips. Target conversion
+tests cover all 256 individual bits, zero and maximum targets, and an exactly
+representable value spanning two limbs at every offset. These are ordinary
+correctness tests; they do not require sanitizer instrumentation or a separate
+host runner.
+
 ## Downstream compatibility
 
 Bonanza 1002/BZM adopted this common-job interface unchanged in
@@ -81,6 +89,14 @@ submission. Driver capabilities, timestamp-rolling permissions, and wider
 self-test refactoring remain outside this change.
 
 ## Validation
+
+### Hash-byte unit tests (2026-09-16)
+
+- Fresh ESP-IDF 6.0.2 / ESP32-S3 QEMU build: **143 tests, 0 failures,
+  0 ignored**, including the expanded reversal tests and two target-conversion
+  tests. The build uses no sanitizer instrumentation.
+- `git diff --check` passes. Local build and QEMU logs are in
+  `build/qemu-hash-validation/` in the rebase worktree.
 
 ### Rebase onto master (2026-09-16)
 

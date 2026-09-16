@@ -50,10 +50,6 @@ retains the existing zero-hash behavior. Sending a job still adds one
 short-lived allocation for common work; result snapshots replace the old pair
 of metadata allocations with inline owned strings.
 
-CI runs `python3 tools/check_mining_boundary.py` to reject Bitmain types,
-helpers, or ASIC dependencies in Stratum code and its tests, and to keep the
-common ASIC API free of Bitmain work.
-
 ## Hash byte alignment
 
 `reverse_32bit_words()`, `reverse_endianness_per_word()`, and `le256todouble()`
@@ -103,7 +99,7 @@ self-test refactoring remain outside this change.
 - Full ESP32-S3 firmware build passes using the existing web UI bundle,
   with 35% app partition space free. The frontend was unchanged and was not
   rebuilt for this validation.
-- The mining boundary check and `git diff --check` pass.
+- `git diff --check` passes.
 
 Local logs are in `build/rebase-validation/` in the rebase worktree. No physical
 miner was flashed or exercised for this rebase.
@@ -118,7 +114,7 @@ miner was flashed or exercised for this rebase.
   fails on the previous implementation with a misaligned-write diagnostic.
   Leak checking was disabled for the local sandbox's ptrace restriction.
 - Full firmware build passes with the existing web UI bundle and 35% app
-  partition space free. The mining boundary check and `git diff --check` pass.
+  partition space free. `git diff --check` passes.
 
 Local QEMU logs are in `build/pr1972-review-validation/`. No physical miner was
 flashed for this follow-up.
@@ -140,7 +136,7 @@ flashed for this follow-up.
 - All 23 Stratum/SV2 production and test translation units compile without
   ASIC include paths. The built Stratum archive contains no Bitmain job,
   midstate, or counter helpers, and the firmware contains no legacy constructor.
-- `python3 tools/check_mining_boundary.py` and `git diff --check` pass.
+- `git diff --check` passes.
 
 Logs are in `build/complete-job-boundary-validation/`. The clean QEMU build is
 in the workspace's `build/complete-job-boundary-qemu/` directory. No physical

@@ -154,7 +154,7 @@ TEST_CASE("BM1397 work packet and returned midstate preserve version mapping",
         queue_bm1397_job_response(4, index, nonce);
         const task_result *result = bm1397_harness_driver.process_work(state);
         TEST_ASSERT_NOT_NULL(result);
-        TEST_ASSERT_EQUAL_HEX8(4, result->job_id);
+        TEST_ASSERT_EQUAL_STRING("packet-job", result->job.job_id);
         TEST_ASSERT_EQUAL_HEX32(nonce, result->nonce);
         TEST_ASSERT_EQUAL_HEX32(expected_versions[index], result->rolled_version);
         TEST_ASSERT_TRUE(result->timestamp_us == UINT64_C(123456789));
@@ -223,7 +223,8 @@ TEST_CASE("BM1397 register results preserve type address value and reset job fie
     TEST_ASSERT_EQUAL_INT(REGISTER_ERROR_COUNT, result->register_type);
     TEST_ASSERT_EQUAL_UINT8(1, result->asic_nr);
     TEST_ASSERT_EQUAL_HEX32(0x12345678, result->value);
-    TEST_ASSERT_EQUAL_HEX8(0, result->job_id);
+    const uint8_t empty_job[sizeof(asic_job_t)] = {0};
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(empty_job, &result->job, sizeof(empty_job));
     TEST_ASSERT_EQUAL_HEX32(0, result->nonce);
     TEST_ASSERT_EQUAL_HEX32(0, result->rolled_version);
     TEST_ASSERT_TRUE(result->timestamp_us == UINT64_C(123456789));
@@ -257,7 +258,7 @@ TEST_CASE("BM1397 rejects inactive job results and repeated nonces",
     queue_bm1397_job_response(job_id, 2, nonce);
     const task_result *result = bm1397_harness_driver.process_work(state);
     TEST_ASSERT_NOT_NULL(result);
-    TEST_ASSERT_EQUAL_HEX8(job_id, result->job_id);
+    TEST_ASSERT_EQUAL_STRING("packet-job", result->job.job_id);
     TEST_ASSERT_EQUAL_HEX32(nonce, result->nonce);
     TEST_ASSERT_EQUAL_HEX32(0x20004004, result->rolled_version);
 

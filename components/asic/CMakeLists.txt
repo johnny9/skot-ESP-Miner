@@ -13,7 +13,6 @@ SRCS
     "bm_hashrate.c"
     "bitmain_job_packet.c"
     "bm_job_midstate.c"
-    "asic_job_store.c"
     "frequency_transition_bmXX.c"
     "pll.c"
 

@@ -37,25 +37,19 @@ void ASIC_result_task(void *pvParameters)
             continue;
         }
 
-        uint8_t job_id = asic_result->job_id;
-
-        asic_job_t job;
-        if (!ASIC_get_job_snapshot(GLOBAL_STATE, job_id, &job)) {
-            ESP_LOGW(TAG, "Invalid job nonce found, 0x%02X", job_id);
-            continue;
-        }
-        double nonce_difficulty = mining_nonce_difficulty(&job, asic_result->nonce, asic_result->rolled_version);
+        const asic_job_t *job = &asic_result->job;
+        double nonce_difficulty = mining_nonce_difficulty(job, asic_result->nonce, asic_result->rolled_version);
 
         if (GLOBAL_STATE->SELF_TEST_MODULE.is_active) {
             self_test_record_nonce(GLOBAL_STATE, nonce_difficulty);
             continue;
         }
 
-        uint32_t version_bits = asic_result->rolled_version ^ job.version;
-        if (job.pool_diff > 0.0 && nonce_difficulty >= job.pool_diff)
+        uint32_t version_bits = asic_result->rolled_version ^ job->version;
+        if (job->pool_diff > 0.0 && nonce_difficulty >= job->pool_diff)
         {
             uint64_t sent_time_us = 0;
-            int submit_result = stratum_submit_share(GLOBAL_STATE, &job, asic_result->nonce, asic_result->rolled_version, &sent_time_us);
+            int submit_result = stratum_submit_share(GLOBAL_STATE, job, asic_result->nonce, asic_result->rolled_version, &sent_time_us);
             if (submit_result >= 0 && sent_time_us > 0) {
                 float process_time = (sent_time_us - asic_result->timestamp_us) / 1000.0f;
                 GLOBAL_STATE->SYSTEM_MODULE.process_time = process_time;
@@ -63,10 +57,10 @@ void ASIC_result_task(void *pvParameters)
             }
         }
 
-        ESP_LOGI(TAG, "ID: %s, ASIC nr: %d, Core: %d/%d, ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %g.", job.job_id, asic_result->asic_nr, asic_result->core_id, asic_result->small_core_id, asic_result->rolled_version, asic_result->nonce, nonce_difficulty, job.pool_diff);
+        ESP_LOGI(TAG, "ID: %s, ASIC nr: %d, Core: %d/%d, ver: %08" PRIX32 " Nonce %08" PRIX32 " diff %.1f of %g.", job->job_id, asic_result->asic_nr, asic_result->core_id, asic_result->small_core_id, asic_result->rolled_version, asic_result->nonce, nonce_difficulty, job->pool_diff);
 
-        SYSTEM_notify_found_nonce(GLOBAL_STATE, nonce_difficulty, job.nbits);
+        SYSTEM_notify_found_nonce(GLOBAL_STATE, nonce_difficulty, job->nbits);
 
-        scoreboard_add(&GLOBAL_STATE->SYSTEM_MODULE.scoreboard, nonce_difficulty, job.job_id, job.extranonce2, job.ntime, asic_result->nonce, version_bits);
+        scoreboard_add(&GLOBAL_STATE->SYSTEM_MODULE.scoreboard, nonce_difficulty, job->job_id, job->extranonce2, job->ntime, asic_result->nonce, version_bits);
     }
 }

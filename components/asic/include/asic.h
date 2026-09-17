@@ -19,7 +19,7 @@ task_result * ASIC_process_work(GlobalState * GLOBAL_STATE);
 int ASIC_set_max_baud(GlobalState * GLOBAL_STATE);
 /* The caller retains ownership and may release the job after this call. */
 void ASIC_send_job(GlobalState *state, const asic_job_t *job);
-/* Copies a valid job's header fields and metadata into caller-owned storage
+/* Copies the retained common job into caller-owned storage
  * under the slot lock, without allocating. The snapshot survives slot reuse
  * so result processing can continue after unlocking. Unchanged on failure. */
 bool ASIC_get_job_snapshot(GlobalState *state, uint8_t job_id, asic_job_t *snapshot);

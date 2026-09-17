@@ -1,21 +1,22 @@
 #include "asic.h"
-#include "bm_job.h"
-#include "global_state.h"
+#include "asic_internal.h"
 #include "esp_log.h"
 #include <stdlib.h>
+#include <string.h>
 
 void ASIC_send_job(GlobalState *state, const asic_job_t *job)
 {
-    bm_job *bitmain_job = malloc(sizeof(*bitmain_job));
-    if (bitmain_job == NULL) {
-        ESP_LOGE("asic", "Failed to allocate Bitmain work");
+    if (job == NULL ||
+        memchr(job->job_id, 0, sizeof(job->job_id)) == NULL ||
+        memchr(job->extranonce2, 0, sizeof(job->extranonce2)) == NULL) {
+        ESP_LOGE("asic", "Invalid common job metadata");
         return;
     }
-    if (!bm_job_build_from_asic_job(job,
-            state->DEVICE_CONFIG.family.asic.software_midstates, bitmain_job)) {
-        ESP_LOGE("asic", "Failed to build Bitmain job");
-        free(bitmain_job);
+    asic_job_t *retained_job = malloc(sizeof(*retained_job));
+    if (retained_job == NULL) {
+        ESP_LOGE("asic", "Failed to allocate common job");
         return;
     }
-    ASIC_send_work(state, bitmain_job);
+    *retained_job = *job;
+    ASIC_send_work(state, retained_job);
 }

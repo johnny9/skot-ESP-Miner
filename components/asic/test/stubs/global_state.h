@@ -31,7 +31,7 @@ typedef struct GlobalState {
         } family;
     } DEVICE_CONFIG;
     struct {
-        struct bm_job **active_jobs;
+        struct asic_job **active_jobs;
         uint8_t *valid_jobs;
         pthread_mutex_t valid_jobs_lock;
     } ASIC_TASK_MODULE;

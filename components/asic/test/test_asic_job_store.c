@@ -1,6 +1,6 @@
-#include "bm_job_store_test_bindings.h"
+#include "asic_job_store_test_bindings.h"
 #include "asic.h"
-#include "bm_job.h"
+#include "job_pipeline_test_harness.h"
 #include "global_state.h"
 #include "mining.h"
 #include "unity.h"
@@ -10,7 +10,7 @@
 TEST_CASE("job snapshots retain header fields and metadata after slot replacement",
           "[asic-job][ownership]")
 {
-    static bm_job *slots[MAX_ASIC_JOBS];
+    static asic_job_t *slots[MAX_ASIC_JOBS];
     static uint8_t valid[MAX_ASIC_JOBS];
     static GlobalState state;
     memset(slots, 0, sizeof(slots));
@@ -33,18 +33,24 @@ TEST_CASE("job snapshots retain header fields and metadata after slot replacemen
         }
         memset(original.job_id, 'j', sizeof(original.job_id) - 1);
         memset(original.extranonce2, 'a', sizeof(original.extranonce2) - 1);
-        slots[127] = malloc(sizeof(*slots[127]));
-        TEST_ASSERT_NOT_NULL(slots[127]);
-        TEST_ASSERT_TRUE(bm_job_build_from_asic_job(&original, 4, slots[127]));
+        asic_job_t source = original;
+        job_pipeline_harness_result_t submitted;
+        job_pipeline_harness_send_job(&source, &submitted);
+        TEST_ASSERT_EQUAL_UINT32(1, submitted.job_count);
+        slots[127] = submitted.jobs[0];
+        memset(&source, 0xa5, sizeof(source));
         valid[127] = 1;
 
         asic_job_t snapshot;
         TEST_ASSERT_TRUE(ASIC_get_job_snapshot(&state, 127, &snapshot));
         TEST_ASSERT_EQUAL_INT(0, pthread_mutex_trylock(&state.ASIC_TASK_MODULE.valid_jobs_lock));
-        free_bm_job(slots[127]);
-        slots[127] = NULL;
-        valid[127] = 0;
+        job_pipeline_harness_result_free(&submitted);
+        asic_job_t replacement = {.job_id = "replacement"};
+        slots[127] = &replacement;
         TEST_ASSERT_EQUAL_INT(0, pthread_mutex_unlock(&state.ASIC_TASK_MODULE.valid_jobs_lock));
+        asic_job_t current;
+        TEST_ASSERT_TRUE(ASIC_get_job_snapshot(&state, 127, &current));
+        TEST_ASSERT_EQUAL_STRING("replacement", current.job_id);
 
         uint8_t original_header[80], snapshot_header[80];
         asic_job_header(&original, original.starting_nonce, original.version, original_header);
@@ -58,6 +64,8 @@ TEST_CASE("job snapshots retain header fields and metadata after slot replacemen
         TEST_ASSERT_EQUAL_STRING(original.extranonce2, snapshot.extranonce2);
         TEST_ASSERT_EQUAL_DOUBLE(mining_nonce_difficulty(&original, 7, 0x20002004),
                                  mining_nonce_difficulty(&snapshot, 7, 0x20002004));
+        slots[127] = NULL;
+        valid[127] = 0;
     }
     TEST_ASSERT_EQUAL_INT(0, pthread_mutex_destroy(&state.ASIC_TASK_MODULE.valid_jobs_lock));
 }
@@ -65,7 +73,7 @@ TEST_CASE("job snapshots retain header fields and metadata after slot replacemen
 TEST_CASE("ASIC snapshots reject unavailable jobs without modifying the destination",
           "[asic-job][ownership]")
 {
-    static bm_job *slots[MAX_ASIC_JOBS];
+    static asic_job_t *slots[MAX_ASIC_JOBS];
     static uint8_t valid[MAX_ASIC_JOBS];
     static GlobalState state;
     memset(slots, 0, sizeof(slots));
@@ -86,34 +94,12 @@ TEST_CASE("ASIC snapshots reject unavailable jobs without modifying the destinat
     TEST_ASSERT_FALSE(ASIC_get_job_snapshot(&state, 0, &output));
     valid[0] = 1;
     TEST_ASSERT_FALSE(ASIC_get_job_snapshot(&state, 0, &output));
-    bm_job incomplete = {0};
-    memset(incomplete.job_id, 'x', sizeof(incomplete.job_id));
-    slots[0] = &incomplete;
+    asic_job_t inactive = {0};
+    slots[0] = &inactive;
+    valid[0] = 0;
     TEST_ASSERT_FALSE(ASIC_get_job_snapshot(&state, 0, &output));
     TEST_ASSERT_EQUAL_MEMORY(&original, &output, sizeof(output));
     TEST_ASSERT_EQUAL_INT(0, pthread_mutex_trylock(&state.ASIC_TASK_MODULE.valid_jobs_lock));
     TEST_ASSERT_EQUAL_INT(0, pthread_mutex_unlock(&state.ASIC_TASK_MODULE.valid_jobs_lock));
     TEST_ASSERT_EQUAL_INT(0, pthread_mutex_destroy(&state.ASIC_TASK_MODULE.valid_jobs_lock));
-}
-
-TEST_CASE("Bitmain snapshot conversion rejects unterminated metadata without truncation",
-          "[asic-job][ownership]")
-{
-    bm_job source = {0};
-    memset(source.job_id, 'x', sizeof(source.job_id));
-    asic_job_t output, original;
-    memset(&original, 0xa5, sizeof(original));
-    memcpy(&output, &original, sizeof(output));
-    TEST_ASSERT_FALSE(bm_job_to_asic_job(NULL, &output));
-    TEST_ASSERT_FALSE(bm_job_to_asic_job(&source, NULL));
-    TEST_ASSERT_FALSE(bm_job_to_asic_job(&source, &output));
-    TEST_ASSERT_EQUAL_MEMORY(&original, &output, sizeof(output));
-    source.job_id[0] = 0;
-    memset(source.extranonce2, 'a', sizeof(source.extranonce2));
-    TEST_ASSERT_FALSE(bm_job_to_asic_job(&source, &output));
-    TEST_ASSERT_EQUAL_MEMORY(&original, &output, sizeof(output));
-    source.extranonce2[0] = 0;
-    TEST_ASSERT_TRUE(bm_job_to_asic_job(&source, &output));
-    TEST_ASSERT_EQUAL_STRING("", output.job_id);
-    TEST_ASSERT_EQUAL_STRING("", output.extranonce2);
 }

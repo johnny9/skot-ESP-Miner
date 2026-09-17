@@ -5,9 +5,6 @@
 #include <string.h>
 #include "bitmain_job_allocator_fault_injector.h"
 
-#define bm_job_build_from_asic_job test_bm_job_build_from_asic_job
-#define bm_job_to_asic_job test_bm_job_to_asic_job
-#define free_bm_job test_free_bm_job
 #define malloc(size) bitmain_job_allocator_fault_injector_malloc(size)
 
 #endif

@@ -120,6 +120,31 @@ TEST_CASE("Validate version mask incrementing", "[mining]")
     TEST_ASSERT_EQUAL_UINT32(0x20000404, rolled_version);
 }
 
+TEST_CASE("Version mask increment preserves unmasked bits across carries and wraparound", "[mining]")
+{
+    static const struct {
+        uint32_t value;
+        uint32_t mask;
+        uint32_t expected;
+    } cases[] = {
+        {0x20000004, 0x00000000, 0x20000004},
+        {0xffffffff, 0x00000000, 0xffffffff},
+        {0x20000004, 0x1fffe000, 0x20002004},
+        {0x3fffe004, 0x1fffe000, 0x20000004},
+        {0x20002004, 0x1000a000, 0x20008004},
+        {0x2000a004, 0x1000a000, 0x30000004},
+        {0x3000a004, 0x1000a000, 0x20000004},
+        {0x80000001, 0x80000001, 0x00000000},
+        {0x00000001, 0x80000001, 0x80000000},
+        {0xffffffff, 0xffffffff, 0x00000000},
+        {0x7fffffff, 0xffffffff, 0x80000000},
+    };
+
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
+        TEST_ASSERT_EQUAL_HEX32(cases[i].expected, increment_bitmask(cases[i].value, cases[i].mask));
+    }
+}
+
 TEST_CASE("Test nonce diff checking", "[mining][test-nonce]")
 {
     asic_job_t mjob;

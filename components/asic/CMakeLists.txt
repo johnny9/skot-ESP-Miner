@@ -11,9 +11,9 @@ SRCS
     "asic.c"
     "asic_submit.c"
     "bm_hashrate.c"
-    "bm_job.c"
+    "bitmain_job_packet.c"
     "bm_job_midstate.c"
-    "bm_job_store.c"
+    "asic_job_store.c"
     "frequency_transition_bmXX.c"
     "pll.c"
 

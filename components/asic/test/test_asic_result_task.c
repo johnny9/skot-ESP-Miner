@@ -1,4 +1,4 @@
-#include "bm_job.h"
+#include "asic_job.h"
 #include "result_task_test_bindings.h"
 
 #include "asic.h"
@@ -33,7 +33,7 @@ typedef struct {
 
 static jmp_buf fixture_done;
 static GlobalState fixture_state;
-static bm_job *fixture_slots[128];
+static asic_job_t *fixture_slots[128];
 static uint8_t fixture_valid[128];
 static task_result fixture_events[2];
 static size_t fixture_event_index;
@@ -87,7 +87,7 @@ int result_task_fake_submit_share(GlobalState *state, const asic_job_t *job,
     if (fixture_case.replace_during_submit) {
         pthread_mutex_lock(
             &fixture_state.ASIC_TASK_MODULE.valid_jobs_lock);
-        free_bm_job(fixture_slots[8]);
+        free(fixture_slots[8]);
         fixture_slots[8] = NULL;
         fixture_valid[8] = 0;
         pthread_mutex_unlock(
@@ -162,12 +162,12 @@ static void run_result_case(result_case_t test_case)
     fixture_slots[8]->ntime = 123;
     fixture_slots[8]->nbits = 0x1705dd01;
     fixture_slots[8]->pool_diff = fixture_case.pool_diff;
-    fixture_slots[8]->job_type = fixture_case.protocol;
+    fixture_slots[8]->source_type = fixture_case.protocol;
     strcpy(fixture_slots[8]->job_id, "42");
     strcpy(fixture_slots[8]->extranonce2, "aabb");
     fixture_valid[8] = !fixture_case.invalid;
     if (fixture_case.missing) {
-        free_bm_job(fixture_slots[8]);
+        free(fixture_slots[8]);
         fixture_slots[8] = NULL;
     }
 
@@ -200,7 +200,7 @@ static void run_result_case(result_case_t test_case)
     TEST_ASSERT_EQUAL_UINT32(1, fixture_registers);
     TEST_ASSERT_EQUAL_UINT32(fixture_case.paused ? 1 : 0, fixture_delays);
     if (fixture_slots[8] != NULL) {
-        free_bm_job(fixture_slots[8]);
+        free(fixture_slots[8]);
         fixture_slots[8] = NULL;
     }
     TEST_ASSERT_EQUAL_INT(

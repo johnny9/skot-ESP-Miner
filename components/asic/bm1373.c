@@ -1,4 +1,4 @@
-#include "bm_job.h"
+#include "bitmain_job_packet.h"
 #include "bm1373.h"
 
 #include "crc.h"
@@ -451,18 +451,11 @@ int BM1373_set_max_baud(void)
 
 static uint8_t id = 0;
 
-void BM1373_send_work(GlobalState * GLOBAL_STATE, bm_job * next_bm_job)
+void BM1373_send_work(GlobalState * GLOBAL_STATE, asic_job_t * next_job)
 {
-    BM1373_job job;
+    bm13xx_job_packet_t job;
     id = (id + 24) % 128;
-    job.job_id = id;
-    job.num_midstates = 0x01;
-    memcpy(&job.starting_nonce, &next_bm_job->starting_nonce, 4);
-    memcpy(&job.nbits, &next_bm_job->nbits, 4);
-    memcpy(&job.ntime, &next_bm_job->ntime, 4);
-    memcpy(job.merkle_root, next_bm_job->merkle_root, 32);
-    memcpy(job.prev_block_hash, next_bm_job->prev_block_hash, 32);
-    memcpy(&job.version, &next_bm_job->version, 4);
+    bm13xx_build_job_packet(next_job, id, &job);
 
     // Hold valid_jobs_lock across the free + reassignment so the result task
     // (which snapshots active_jobs[job_id] under the same lock) can never observe
@@ -470,9 +463,9 @@ void BM1373_send_work(GlobalState * GLOBAL_STATE, bm_job * next_bm_job)
     // same critical section so validity and the pointer stay consistent.
     pthread_mutex_lock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
     if (GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id] != NULL) {
-        free_bm_job(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id]);
+        free(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id]);
     }
-    GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id] = next_bm_job;
+    GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id] = next_job;
     GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs[job.job_id] = 1;
     pthread_mutex_unlock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
 
@@ -481,7 +474,7 @@ void BM1373_send_work(GlobalState * GLOBAL_STATE, bm_job * next_bm_job)
     ESP_LOGI(TAG, "Send Job: %02X", job.job_id);
     #endif
 
-    _send_BM1373((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *)&job, sizeof(BM1373_job), BM1373_DEBUG_WORK);
+    _send_BM1373((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *)&job, sizeof(job), BM1373_DEBUG_WORK);
 }
 
 task_result * BM1373_process_work(GlobalState * GLOBAL_STATE)

@@ -6,10 +6,10 @@
 #include <stdint.h>
 
 #include "mining.h"
-#include "bm_job.h"
+#include "asic_job.h"
 
 typedef struct GlobalState GlobalState;
-void spy_asic_send_work(GlobalState *state, bm_job *job);
+void spy_asic_send_work(GlobalState *state, asic_job_t *job);
 void test_asic_send_job(GlobalState *state, const asic_job_t *job);
 
 typedef struct {
@@ -34,7 +34,7 @@ typedef struct {
 } job_pipeline_harness_event_t;
 
 typedef struct {
-    bm_job *jobs[JOB_PIPELINE_HARNESS_MAX_JOBS];
+    asic_job_t *jobs[JOB_PIPELINE_HARNESS_MAX_JOBS];
     size_t job_count;
     uint32_t version_masks[JOB_PIPELINE_HARNESS_MAX_JOBS];
     size_t version_mask_count;
@@ -52,7 +52,6 @@ void job_pipeline_harness_run(
 
 void job_pipeline_harness_result_free(job_pipeline_harness_result_t *result);
 
-void job_pipeline_harness_send_job(uint8_t software_midstates,
-    const asic_job_t *job, job_pipeline_harness_result_t *result);
+void job_pipeline_harness_send_job(const asic_job_t *job, job_pipeline_harness_result_t *result);
 
 #endif /* JOB_PIPELINE_TEST_HARNESS_H */

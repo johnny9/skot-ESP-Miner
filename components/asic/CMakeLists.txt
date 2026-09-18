@@ -1,5 +1,32 @@
 idf_component_register(
-SRCS 
+SRCS
+    "bzm_driver.c"
+    "bzm_result.c"
+    "bzm_transport.c"
+    "bzm_bridge.c"
+    "bzm_serial.c"
+
+    "bzm.c"
+    "bzm_balanced_ramp.c"
+    "bzm_bringup.c"
+    "bzm_dispatch_gate.c"
+    "bzm_frame_parser.c"
+    "bzm_frequency.c"
+    "bzm_job_store.c"
+    "bzm_lease_guard.c"
+    "bzm_power.c"
+    "bzm_reactor.c"
+    "bzm_registers.c"
+    "bzm_result_dedup.c"
+    "bzm_running_evidence.c"
+    "bzm_runtime_health.c"
+    "bzm_supervisor.c"
+    "bzm_telemetry.c"
+    "bzm_topology.c"
+    "bzm_tps546_verify.c"
+    "bzm_validation.c"
+    "bzm_work.c"
+
     "bm1373.c"
     "bm1370.c"
     "bm1368.c"
@@ -16,19 +43,23 @@ SRCS
     "frequency_transition_bmXX.c"
     "pll.c"
 
-INCLUDE_DIRS 
+INCLUDE_DIRS
     "include"
 
 PRIV_INCLUDE_DIRS
     "private_include"
 
-REQUIRES 
+REQUIRES
     "mining_job"
     "freertos"
     "esp_driver_uart"
     "stratum"
     "stratum_v2"
     "tcp_transport"
+    "esp_timer"
+    "esp_psram"
+    "esp_driver_gpio"
+    "heap"
 )
 
 target_include_directories(${COMPONENT_LIB} PRIVATE

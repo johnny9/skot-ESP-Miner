@@ -3,6 +3,7 @@
 #include <inttypes.h>
 
 #include "global_state.h"
+#include "device_config.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "mining.h"
@@ -109,7 +110,9 @@ void create_jobs_task(void *pvParameters)
             extranonce_2++;
         } else if (!GLOBAL_STATE->DEVICE_CONFIG.family.asic.hardware_version_rolling) {
             // Software version rolling for ASICs without hardware version rolling (e.g. BM1397) on SV2 Standard Channel
-            uint32_t mask = (current_work->version_mask != 0) ? current_work->version_mask : BIP320_VERSION_ROLLING_MASK;
+            uint32_t mask = current_work->version_mask;
+            if (mask == 0 && GLOBAL_STATE->DEVICE_CONFIG.family.asic.id != BZM)
+                mask = BIP320_VERSION_ROLLING_MASK;
             uint8_t midstates = GLOBAL_STATE->DEVICE_CONFIG.family.asic.software_midstates;
             for (int i = 0; i < midstates; i++) {
                 current_version = increment_bitmask(current_version, mask);

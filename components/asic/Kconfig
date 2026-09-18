@@ -1,0 +1,269 @@
+    menu "Bitaxe 1002 Bonanza production safety"
+        config BZM_1002_PROOF_TIMEOUT_SECONDS
+            int "Initial mining proof timeout (seconds)"
+            range 1 300
+            default 15
+            help
+                Maximum RUNNING time allowed to prove one complete four-ASIC
+                work dispatch and the configured number of locally valid ASIC
+                results. Missing initial proof is BAD and forces safe-off.
+
+        config BZM_1002_RESULT_RECOVERY_TIMEOUT_MS
+            int "Maximum time without locally validated result proof (milliseconds)"
+            range 1000 30000
+            default 5000
+            help
+                After mining proof has been established, tolerate bursts of
+                unchecksummed nonce-like frames only while a new locally
+                validated result arrives inside this bound. Raw mapping and
+                local-rejection streaks remain visible diagnostics; they are
+                not safety evidence on their own.
+
+        config BZM_1002_MIN_VALID_RESULTS
+            int "Minimum locally valid mining results"
+            range 1 100
+            default 1
+            help
+                Number of current-work ASIC results that must map to the
+                active generation and pass local nonce/work validation.
+
+        config BZM_1002_MAX_LOCAL_REJECTIONS
+            int "Diagnostic locally rejected-result streak threshold"
+            range 0 100
+            default 1
+            help
+                Maximum consecutive current-work ASIC results that may fail
+                local nonce/work validation. A later locally valid nonce
+                resets the streak and proves recovery; the lifetime total
+                remains visible. The proof-recovery timeout, rather than an
+                unchecksummed raw-frame count, forces safe-off. Non-nonce
+                status frames are not results.
+
+        config BZM_1002_MAX_MAPPING_REJECTIONS
+            int "Diagnostic result-attribution rejection streak threshold"
+            range 1 100
+            default 2
+            help
+                Maximum consecutive unattributable nonce-like frames when
+                mapping recovery is enabled. A later locally valid nonce
+                resets the streak while the lifetime total remains visible.
+                Failing to recover before the result-proof recovery timeout
+                is BAD and forces safe-off.
+
+        config BZM_1002_MIN_NONCE_DIFFICULTY
+            int "Minimum locally verified nonce difficulty"
+            range 1 1024
+            default 16
+            help
+                Minimum locally calculated difficulty for each result counted
+                as mining-health evidence. A mapped result below this floor is a
+                local validation rejection, because the ASIC result filter is
+                configured to suppress it before transmission. The production
+                default therefore matches the 36-bit ASIC filter at
+                difficulty 16 instead of treating arbitrary difficulty-one
+                reconstructions as useful-hashrate evidence.
+
+        config BZM_1002_LEAD_ZEROS
+            int "ASIC result-filter leading-zero bits"
+            range 32 64
+            default 36
+            help
+                Program every Bonanza engine to report only hashes with at
+                least this many leading zero bits. The production BIRDS wire
+                encoding uses register value 4 for the 36-bit default, which
+                retains frequent samples for measured hashrate. Raising this
+                value reduces result traffic and proof rate; lowering it
+                increases both. Parser loss remains BAD and is controlled by
+                the independent TDM telemetry cadence.
+
+        config BZM_1002_DISPATCH_GAP_US
+            int "Inter-engine bridge drain gap (microseconds)"
+            range 0 2000
+            default 250
+            help
+                After each logical engine has been programmed on all four
+                ASICs, wait for ESP UART TX completion, leave this bounded
+                idle interval on the 2 Mbaud raw bridge link, and drain received TDM
+                traffic. Zero disables the idle interval but retains the TX
+                completion and RX-drain checkpoint. Any checkpoint failure or
+                parser corruption outside the separately configured bounded
+                realignment policy remains BAD and forces safe-off.
+
+        config BZM_1002_PARSER_REALIGN_MAX_DISCARDS
+            int "Maximum discarded bytes per parser realignment"
+            range 1 256
+            default 256
+            help
+                Maximum discarded bytes in one recoverable RUNNING burst.
+                The BIRDS-compatible ASIC-ID/opcode parser resynchronizes after
+                discarded bytes, and local SHA-256 validation prevents damaged
+                result payloads from becoming shares. This bound covers the
+                largest device-observed short burst while the independent event
+                and ten-second bounds still make sustained corruption BAD.
+
+        config BZM_1002_PARSER_REALIGN_CLEAN_WINDOWS
+            int "Clean health windows required after parser realignment"
+            range 1 10
+            default 2
+            help
+                Consecutive 500 ms runtime-health windows with no new discard
+                and no partial buffered frame after a valid post-discard frame
+                before recovery is accepted. Complete results already waiting
+                in the consumer queue do not prevent parser realignment.
+
+        config BZM_1002_PARSER_REALIGN_MAX_WINDOWS
+            int "Maximum parser realignment windows"
+            range 2 20
+            default 20
+            help
+                Maximum 500 ms runtime-health observations allowed for one
+                realignment. Failure to settle within the bounded ten-second
+                window is BAD.
+
+        config BZM_1002_PARSER_REALIGN_MAX_EVENTS
+            int "Maximum discard bursts per parser realignment"
+            range 1 20
+            default 20
+            help
+                Maximum observations with new discarded bytes during one
+                unresolved realignment episode. A successfully realigned
+                parser resets this count; exceeding it before recovery is
+                continuous corruption and is BAD. This normally matches the
+                maximum window count so scheduler sampling does not reject a
+                byte-bounded burst before its time bound expires.
+
+        config BZM_1002_FAN_MIN_RPM
+            int "Provisional minimum fan RPM"
+            range 1 30000
+            default 1000
+            help
+                Minimum fresh fan tach reading before and during mining. This is
+                provisional until the production fan is characterized.
+
+        config BZM_1002_FAN_MIN_PERCENT
+            int "Minimum commanded fan percentage while mining"
+            range 1 100
+            default 36
+            help
+                Clamp automatic and manual Bonanza fan requests to this
+                hardware-qualified floor. The production Bonanza fan remains
+                above the 1000 RPM live interlock at 36 percent. Safe-off,
+                startup, shutdown, maintenance, and faults always request 100
+                percent independently of this setting. The live tach threshold
+                remains authoritative if the fan stalls.
+
+        config BZM_1002_SAFE_OFF_VCORE_MV
+            int "Safe-off VCORE discharge threshold (mV)"
+            range 0 1000
+            default 250
+            help
+                Maximum fresh TPS READ_VOUT that may be reported as a GOOD
+                safe-off result. This threshold must be qualified against
+                the production board discharge network before enabling
+                powered operation.
+
+        config BZM_1002_TELEMETRY_MAX_AGE_MS
+            int "Maximum Bonanza ASIC telemetry age (milliseconds)"
+            range 100 5000
+            default 2000
+            help
+                Sensor, clock and runtime checks reject older samples. Every
+                startup step requires evidence captured after its writes. The
+                two-second runtime bound leaves two complete 500 ms health
+                observations for bounded parser realignment after one damaged
+                TDM region while the independent trip input and telemetry trip
+                bits remain immediate shutdown conditions.
+
+        config BZM_1002_SENSOR_TDM_GAP_COUNT
+            int "Thermal/voltage TDM reporting interval gap"
+            range 0 63
+            default 63
+            help
+                Programs Bonanza local register 0x2d. The production default
+                of 63 minimizes shared TDM traffic at approximately 6.2
+                reports per second per ASIC while remaining inside the
+                default two-second telemetry freshness requirement. Lower
+                values report more often; zero is the BIRDS maximum-rate
+                reference at approximately 394 reports per second per ASIC.
+
+        config BZM_1002_TEMP_MIN_C
+            int "Provisional minimum ASIC temperature (C)"
+            range -100 100
+            default -20
+
+        config BZM_1002_TEMP_MAX_C
+            int "Maximum ASIC temperature (C)"
+            range 1 150
+            default 75
+            help
+                Match upstream ESP-Miner's ASIC overheat threshold. Fresh
+                Bonanza on-die telemetry above this ceiling is BAD: the
+                supervisor safe-offs the miner and the bridge fan is forced
+                to 100 percent. The TPS546 regulator retains its separate
+                105 C warning limit.
+
+        config BZM_1002_STACK_MV_MIN
+            int "Provisional minimum internal stack voltage (mV)"
+            range 0 2000
+            default 300
+
+        config BZM_1002_STACK_MV_MAX
+            int "Provisional maximum internal stack voltage (mV)"
+            range 1 2000
+            default 800
+            help
+                Applied independently to CH0 (bottom stack) and CH1 (top
+                stack). The conversion and limits must be calibrated from
+                device captures before production enablement.
+
+        config BZM_1002_INTERSTACK_DIFF_ABS_MAX_MV
+            int "Maximum absolute CH2 inter-stack differential (mV)"
+            range 1 200
+            default 50
+            help
+                CH2 measures the differential between top-stack VSS and
+                bottom-stack VDD; it is not a third stack voltage. Runtime
+                monitoring requires its absolute value to remain at or below this
+                provisional engineering limit.
+
+        config BZM_1002_CH2_CONFIRM_SAMPLES
+            int "Consecutive CH2 excursions required for shutdown"
+            range 1 10
+            default 3
+            help
+                Number of consecutive fresh per-ASIC telemetry frames that
+                must exceed the CH2 absolute differential limit before the
+                excursion is treated as continuous. A recovered frame resets
+                that ASIC's count. Set to 1 for immediate shutdown. This
+                confirmation applies only to finite CH2 excursions; trips,
+                sensor faults, invalid/stale/missing telemetry, CH0/CH1 or
+                temperature violations and stack imbalance remain immediate
+                failures. Live combined PLL lock telemetry is handled by its
+                separate confirmation setting.
+
+        config BZM_1002_PLL_LOCK_CONFIRM_SAMPLES
+            int "Consecutive combined PLL-lock clears required for shutdown"
+            range 1 10
+            default 3
+            help
+                Number of consecutive fresh per-ASIC telemetry frames whose
+                unchecksummed combined PLL0/PLL1 lock bit must be clear before
+                runtime shutdown. A fresh locked frame resets that ASIC's
+                count. Set to 1 for immediate shutdown. This does not weaken
+                the initial PLL register readback and direct lock
+                validation. Trips, voltage-command changes, and all unrelated
+                safety faults remain immediate failures.
+
+        config BZM_1002_STACK_MAX_SPREAD_MV
+            int "Provisional maximum CH0/CH1 stack spread (mV)"
+            range 1 1000
+            default 100
+            help
+                Maximum absolute difference between CH0 (bottom stack) and
+                CH1 (top stack) on one ASIC. CH2 has its own inter-stack
+                differential limit and is not included in this spread. A
+                larger CH0/CH1 spread is treated as a stack-imbalance fault.
+                This provisional threshold must be calibrated from production
+                device captures.
+
+    endmenu

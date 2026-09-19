@@ -34,13 +34,14 @@
 #define BZM_IO_TASK_PRIORITY 18U
 #define BZM_FREQUENCY_TRANSITION_PROOF_TIMEOUT_MS 30000U
 
-/* Initial proof and recovery require locally validated nonces; raw rejection
+/* Preserve the production sdkconfig.defaults overrides from the source port.
+ * Initial proof and recovery require locally validated nonces; raw rejection
  * streaks are diagnostics, not independent evidence of a safety failure. */
-#define BZM_PROOF_TIMEOUT_MS 15000U
+#define BZM_PROOF_TIMEOUT_MS 90000U
 #define BZM_RESULT_RECOVERY_TIMEOUT_MS 5000U
 #define BZM_MIN_VALID_RESULTS 1U
-#define BZM_MAX_LOCAL_REJECTIONS 1U
-#define BZM_MAX_MAPPING_REJECTIONS 2U
+#define BZM_MAX_LOCAL_REJECTIONS 16U
+#define BZM_MAX_MAPPING_REJECTIONS 16U
 
 /* Recovery needs two clean 500 ms windows and must settle within 20 health
  * observations (10 seconds), with at most 256 discarded bytes. */

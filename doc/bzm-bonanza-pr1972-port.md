@@ -29,6 +29,21 @@ implementation files, preserving the original production defaults. The board
 and driver share only the telemetry freshness limit. No BZM/Bonanza Kconfig
 settings are added; local nonce difficulty derives from the ASIC result filter.
 
+Board 1002 requires the existing ESP-IDF USB console selection because its
+RP2040 bridge uses GPIO43/44, the default UART console pins. For a fresh
+Bonanza configuration, build with:
+
+```sh
+idf.py -B .cache/build-bonanza -DSDKCONFIG=.cache/sdkconfig.bonanza \
+  -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;configs/sdkconfig.bonanza" build
+```
+
+The overlay only selects existing ESP-IDF console options; it adds no custom
+Kconfig settings. USB need not be connected. A default UART-console image
+rejects Bonanza bridge initialization before enabling power. Production proof
+uses the source firmware's 90-second startup window and rejection limits of
+16, including its `sdkconfig.defaults` overrides.
+
 Existing pause, resume, firmware OTA and restart routes delegate to the board
 owner on Bonanza. Self-test waits for board startup and delegates shutdown.
 Bonanza uses the existing headless display mode; external display support is

@@ -479,6 +479,10 @@ static esp_err_t get_gpio(uint8_t command, bool *high)
 
 esp_err_t BZM_bridge_init(void)
 {
+#if CONFIG_ESP_CONSOLE_UART_DEFAULT
+    ESP_LOGE(TAG, "Bonanza bridge GPIO43/44 conflict with the UART console; build with configs/sdkconfig.bonanza");
+    return ESP_ERR_INVALID_STATE;
+#endif
     pthread_mutex_lock(&BRIDGE_LOCK);
     if (INITIALIZED) {
         pthread_mutex_unlock(&BRIDGE_LOCK);

@@ -61,30 +61,30 @@ static bzm_bringup_outcome_t set_report(bzm_bringup_report_t * report, bzm_bring
 
 static void clear_after_chain(bzm_bringup_state_t * state)
 {
-    state->chain_verified = false;
-    state->sensors_verified = false;
-    state->clocks_verified = false;
-    state->balanced_ramp_verified = false;
-    state->running_verified = false;
+    state->chain_initialized = false;
+    state->sensors_configured = false;
+    state->clocks_configured = false;
+    state->engines_active = false;
+    state->running = false;
     state->sensors_configured_us = 0;
     state->clocks_configured_us = 0;
 }
 
 static void clear_after_sensors(bzm_bringup_state_t * state)
 {
-    state->sensors_verified = false;
-    state->clocks_verified = false;
-    state->balanced_ramp_verified = false;
-    state->running_verified = false;
+    state->sensors_configured = false;
+    state->clocks_configured = false;
+    state->engines_active = false;
+    state->running = false;
     state->sensors_configured_us = 0;
     state->clocks_configured_us = 0;
 }
 
 static void clear_after_clocks(bzm_bringup_state_t * state)
 {
-    state->clocks_verified = false;
-    state->balanced_ramp_verified = false;
-    state->running_verified = false;
+    state->clocks_configured = false;
+    state->engines_active = false;
+    state->running = false;
     state->clocks_configured_us = 0;
 }
 
@@ -135,20 +135,6 @@ void bzm_bringup_pll_800_profile(bzm_bringup_pll_profile_t * profile)
 uint32_t bzm_bringup_reference_tdm_control(void)
 {
     return ((uint32_t) BZM_REFERENCE_TDM_SLOT_BIT_COUNT << 9) | ((uint32_t) BZM_REFERENCE_TDM_SLOT_COUNT << 1) | 1U;
-}
-
-const char * bzm_bringup_outcome_name(bzm_bringup_outcome_t outcome)
-{
-    switch (outcome) {
-    case BZM_BRINGUP_GOOD:
-        return "GOOD";
-    case BZM_BRINGUP_BAD:
-        return "BAD";
-    case BZM_BRINGUP_BLOCKED:
-        return "BLOCKED";
-    default:
-        return "UNKNOWN";
-    }
 }
 
 const char * bzm_bringup_reason_name(bzm_bringup_reason_t reason)
@@ -214,7 +200,7 @@ static bool telemetry_policy_is_valid(const bzm_bringup_telemetry_policy_t * pol
            policy->bounds.ch2_abs_max_mv >= 0.0f && policy->bounds.max_stack_spread_mv >= 0.0f;
 }
 
-bzm_bringup_outcome_t bzm_bringup_stage_chain4(bzm_bringup_state_t * state, const bzm_bringup_ops_t * ops, void * ops_context,
+bzm_bringup_outcome_t bzm_bringup_discover_chain(bzm_bringup_state_t * state, const bzm_bringup_ops_t * ops, void * ops_context,
                                                bzm_bringup_report_t * report)
 {
     if (state == NULL || !basic_ops_are_valid(ops) || ops->probe_noop == NULL) {
@@ -281,7 +267,7 @@ bzm_bringup_outcome_t bzm_bringup_stage_chain4(bzm_bringup_state_t * state, cons
                           BZM_BRINGUP_PROBE_NO_RESPONSE, extra_probe, BZM_BRINGUP_ASIC_COUNT);
     }
 
-    state->chain_verified = true;
+    state->chain_initialized = true;
     return set_report(report, BZM_BRINGUP_GOOD, BZM_BRINGUP_REASON_NONE, BZM_LAST_ASIC_ID, 0, BZM_LOCAL_REG_ASIC_ID,
                       BZM_BRINGUP_ASIC_COUNT, BZM_BRINGUP_ASIC_COUNT, BZM_BRINGUP_ASIC_COUNT);
 }
@@ -358,7 +344,7 @@ static bzm_bringup_outcome_t verify_telemetry(const bzm_bringup_ops_t * ops, voi
                                               bool require_clock_locks, bzm_bringup_report_t * report)
 {
     if (ops->telemetry_snapshot == NULL || ops->now_us == NULL) {
-        return set_report(report, BZM_BRINGUP_BLOCKED, BZM_BRINGUP_REASON_CAPABILITY_UNAVAILABLE, 0, 0, 0, 0, 0, 0);
+        return set_report(report, BZM_BRINGUP_BAD, BZM_BRINGUP_REASON_CAPABILITY_UNAVAILABLE, 0, 0, 0, 0, 0, 0);
     }
 
     bzm_telemetry_store_t store = {0};
@@ -420,7 +406,7 @@ static bzm_bringup_outcome_t verify_telemetry(const bzm_bringup_ops_t * ops, voi
                               policy->ch2_confirm_samples, observed_samples, 0);
         }
         if (ops->delay_ms == NULL) {
-            return set_report(report, BZM_BRINGUP_BLOCKED, BZM_BRINGUP_REASON_CAPABILITY_UNAVAILABLE, culprit_asic_id, 0, 0,
+            return set_report(report, BZM_BRINGUP_BAD, BZM_BRINGUP_REASON_CAPABILITY_UNAVAILABLE, culprit_asic_id, 0, 0,
                               policy->ch2_confirm_samples, observed_samples, 0);
         }
         if (attempt == attempt_limit)
@@ -441,7 +427,7 @@ static bzm_bringup_outcome_t verify_telemetry(const bzm_bringup_ops_t * ops, voi
                       policy->ch2_confirm_samples, observed_samples, 0);
 }
 
-bzm_bringup_outcome_t bzm_bringup_stage_sensors(bzm_bringup_state_t * state, const bzm_bringup_ops_t * ops, void * ops_context,
+bzm_bringup_outcome_t bzm_bringup_configure_sensors(bzm_bringup_state_t * state, const bzm_bringup_ops_t * ops, void * ops_context,
                                                 const bzm_bringup_sensor_profile_t * profile,
                                                 const bzm_bringup_telemetry_policy_t * telemetry_policy,
                                                 bzm_bringup_report_t * report)
@@ -450,11 +436,11 @@ bzm_bringup_outcome_t bzm_bringup_stage_sensors(bzm_bringup_state_t * state, con
         !telemetry_policy_is_valid(telemetry_policy)) {
         return set_report(report, BZM_BRINGUP_BAD, BZM_BRINGUP_REASON_INVALID_ARGUMENT, 0, 0, 0, 0, 0, 0);
     }
-    if (!state->chain_verified) {
-        return set_report(report, BZM_BRINGUP_BLOCKED, BZM_BRINGUP_REASON_PREREQUISITE, 0, 0, 0, 1, 0, 0);
+    if (!state->chain_initialized) {
+        return set_report(report, BZM_BRINGUP_BAD, BZM_BRINGUP_REASON_PREREQUISITE, 0, 0, 0, 1, 0, 0);
     }
     if (ops->now_us == NULL || ops->telemetry_snapshot == NULL) {
-        return set_report(report, BZM_BRINGUP_BLOCKED, BZM_BRINGUP_REASON_CAPABILITY_UNAVAILABLE, 0, 0, 0, 0, 0, 0);
+        return set_report(report, BZM_BRINGUP_BAD, BZM_BRINGUP_REASON_CAPABILITY_UNAVAILABLE, 0, 0, 0, 0, 0, 0);
     }
     clear_after_sensors(state);
 
@@ -528,7 +514,7 @@ bzm_bringup_outcome_t bzm_bringup_stage_sensors(bzm_bringup_state_t * state, con
         return outcome;
     }
 
-    state->sensors_verified = true;
+    state->sensors_configured = true;
     return set_report(report, BZM_BRINGUP_GOOD, BZM_BRINGUP_REASON_NONE, BZM_LAST_ASIC_ID, 0, 0, BZM_BRINGUP_ASIC_COUNT,
                       BZM_BRINGUP_ASIC_COUNT, BZM_BRINGUP_ASIC_COUNT);
 }
@@ -567,7 +553,7 @@ static float average_domain_clocks(const bzm_bringup_state_t *state)
         (float)(BZM_BRINGUP_ASIC_COUNT * BZM_BRINGUP_PLL_COUNT);
 }
 
-bzm_bringup_outcome_t bzm_bringup_stage_clocks(bzm_bringup_state_t * state, const bzm_bringup_ops_t * ops, void * ops_context,
+bzm_bringup_outcome_t bzm_bringup_configure_clocks(bzm_bringup_state_t * state, const bzm_bringup_ops_t * ops, void * ops_context,
                                                const bzm_bringup_pll_profile_t * profile,
                                                const bzm_bringup_telemetry_policy_t * telemetry_policy,
                                                bzm_bringup_report_t * report)
@@ -577,11 +563,11 @@ bzm_bringup_outcome_t bzm_bringup_stage_clocks(bzm_bringup_state_t * state, cons
         return set_report(report, BZM_BRINGUP_BAD, BZM_BRINGUP_REASON_INVALID_ARGUMENT, 0, 0, 0, 800,
                           profile == NULL ? 0 : profile->target_mhz, 0);
     }
-    if (!state->sensors_verified) {
-        return set_report(report, BZM_BRINGUP_BLOCKED, BZM_BRINGUP_REASON_PREREQUISITE, 0, 0, 0, 1, 0, 0);
+    if (!state->sensors_configured) {
+        return set_report(report, BZM_BRINGUP_BAD, BZM_BRINGUP_REASON_PREREQUISITE, 0, 0, 0, 1, 0, 0);
     }
     if (ops->now_us == NULL || ops->telemetry_snapshot == NULL) {
-        return set_report(report, BZM_BRINGUP_BLOCKED, BZM_BRINGUP_REASON_CAPABILITY_UNAVAILABLE, 0, 0, 0, 0, 0, 0);
+        return set_report(report, BZM_BRINGUP_BAD, BZM_BRINGUP_REASON_CAPABILITY_UNAVAILABLE, 0, 0, 0, 0, 0, 0);
     }
     clear_after_clocks(state);
 
@@ -723,7 +709,7 @@ bzm_bringup_outcome_t bzm_bringup_stage_clocks(bzm_bringup_state_t * state, cons
         return outcome;
     }
 
-    state->clocks_verified = true;
+    state->clocks_configured = true;
     set_all_domain_clocks(state, BZM_FREQUENCY_POWER_ON_MHZ);
     return set_report(report, BZM_BRINGUP_GOOD, BZM_BRINGUP_REASON_NONE, BZM_LAST_ASIC_ID, 1, 0, 800, 800, BZM_BRINGUP_ASIC_COUNT);
 }
@@ -867,9 +853,9 @@ static bzm_bringup_outcome_t live_frequency_domains_step_once(
     bool changed[BZM_BRINGUP_ASIC_COUNT][BZM_BRINGUP_PLL_COUNT] = {0};
     float shortcut_target = 0.0f;
     if (state == NULL || !basic_ops_are_valid(ops) || target_mhz == NULL ||
-        !state->clocks_verified || !state->running_verified) {
+        !state->clocks_configured || !state->running) {
         return live_frequency_report(
-            report, BZM_BRINGUP_BLOCKED,
+            report, BZM_BRINGUP_BAD,
             BZM_BRINGUP_REASON_INVALID_ARGUMENT, BZM_BRINGUP_ASIC_COUNT, 0,
             0, 0, 0, 0);
     }
@@ -883,7 +869,7 @@ static bzm_bringup_outcome_t live_frequency_domains_step_once(
                 fabsf(targets[asic][pll].actual_mhz -
                        target_mhz[asic][pll]) >= 0.001f) {
                 return live_frequency_report(
-                    report, BZM_BRINGUP_BLOCKED,
+                    report, BZM_BRINGUP_BAD,
                     BZM_BRINGUP_REASON_INVALID_ARGUMENT, asic, pll, 0,
                     (uint32_t)lroundf(current),
                     (uint32_t)lroundf(isfinite(target_mhz[asic][pll])
@@ -902,7 +888,7 @@ static bzm_bringup_outcome_t live_frequency_domains_step_once(
                     targets[asic][pll].actual_mhz >
                         BZM_FREQUENCY_INITIAL_MAX_MHZ) {
                     return live_frequency_report(
-                        report, BZM_BRINGUP_BLOCKED,
+                        report, BZM_BRINGUP_BAD,
                         BZM_BRINGUP_REASON_INVALID_ARGUMENT, asic, pll, 0,
                         (uint32_t)BZM_FREQUENCY_POWER_ON_MHZ,
                         (uint32_t)lroundf(target_mhz[asic][pll]), 0);
@@ -912,7 +898,7 @@ static bzm_bringup_outcome_t live_frequency_domains_step_once(
                 } else if (fabsf(shortcut_target -
                                  targets[asic][pll].actual_mhz) >= 0.001f) {
                     return live_frequency_report(
-                        report, BZM_BRINGUP_BLOCKED,
+                        report, BZM_BRINGUP_BAD,
                         BZM_BRINGUP_REASON_INVALID_ARGUMENT, asic, pll, 0,
                         (uint32_t)lroundf(shortcut_target),
                         (uint32_t)lroundf(target_mhz[asic][pll]), 0);
@@ -920,7 +906,7 @@ static bzm_bringup_outcome_t live_frequency_domains_step_once(
             } else if (changed[asic][pll] &&
                        delta > BZM_FREQUENCY_RAMP_STEP_MHZ + 0.001f) {
                 return live_frequency_report(
-                    report, BZM_BRINGUP_BLOCKED,
+                    report, BZM_BRINGUP_BAD,
                     BZM_BRINGUP_REASON_INVALID_ARGUMENT, asic, pll, 0,
                     (uint32_t)lroundf(current),
                     (uint32_t)lroundf(target_mhz[asic][pll]), 0);
@@ -1002,55 +988,21 @@ bzm_bringup_outcome_t bzm_bringup_live_frequency_domains_step(
     return BZM_BRINGUP_BAD;
 }
 
-static bool topology_is_exact(void)
-{
-    bool physical_seen[BZM_TOPOLOGY_COLUMNS * 64U] = {false};
-    uint16_t stack_counts[BZM_ENGINE_STACK_COUNT] = {0};
-
-    for (uint16_t index = 0; index < BZM_TOPOLOGY_ENGINE_COUNT; ++index) {
-        bzm_engine_location_t engine;
-        if (!bzm_topology_engine_at(index, &engine) || engine.topology_index != index ||
-            engine.physical_id >= sizeof(physical_seen) / sizeof(physical_seen[0]) || physical_seen[engine.physical_id] ||
-            !bzm_topology_coordinate_is_valid(engine.row, engine.column) || engine.stack >= BZM_ENGINE_STACK_COUNT) {
-            return false;
-        }
-        physical_seen[engine.physical_id] = true;
-        ++stack_counts[engine.stack];
-    }
-    if (stack_counts[BZM_ENGINE_STACK_BOTTOM] != BZM_TOPOLOGY_STACK_ENGINE_COUNT ||
-        stack_counts[BZM_ENGINE_STACK_TOP] != BZM_TOPOLOGY_STACK_ENGINE_COUNT) {
-        return false;
-    }
-
-    for (uint16_t index = 0; index < BZM_TOPOLOGY_PAIR_COUNT; ++index) {
-        bzm_engine_pair_t pair;
-        if (!bzm_topology_balanced_pair_at(index, &pair) || pair.pair_index != index ||
-            pair.bottom.stack != BZM_ENGINE_STACK_BOTTOM || pair.top.stack != BZM_ENGINE_STACK_TOP ||
-            pair.bottom.stack_index != index || pair.top.stack_index != index || pair.bottom.physical_id == pair.top.physical_id) {
-            return false;
-        }
-    }
-    return BZM_TOPOLOGY_ENGINE_COUNT == 236U && BZM_TOPOLOGY_PAIR_COUNT == 118U;
-}
-
-bzm_bringup_outcome_t bzm_bringup_stage_balanced_ramp(bzm_bringup_state_t * state, const bzm_bringup_ops_t * ops,
+bzm_bringup_outcome_t bzm_bringup_activate_engines(bzm_bringup_state_t * state, const bzm_bringup_ops_t * ops,
                                                       void * ops_context, const bzm_bringup_telemetry_policy_t * telemetry_policy,
                                                       bzm_bringup_report_t * report)
 {
     if (state == NULL || ops == NULL) {
         return set_report(report, BZM_BRINGUP_BAD, BZM_BRINGUP_REASON_INVALID_ARGUMENT, 0, 0, 0, 0, 0, 0);
     }
-    state->balanced_ramp_verified = false;
-    state->running_verified = false;
-    if (!state->clocks_verified) {
-        return set_report(report, BZM_BRINGUP_BLOCKED, BZM_BRINGUP_REASON_PREREQUISITE, 0, 0, 0, 1, 0, 0);
-    }
-    if (!topology_is_exact()) {
-        return set_report(report, BZM_BRINGUP_BAD, BZM_BRINGUP_REASON_TOPOLOGY, 0, 0, 0, BZM_TOPOLOGY_ENGINE_COUNT, 0, 0);
+    state->engines_active = false;
+    state->running = false;
+    if (!state->clocks_configured) {
+        return set_report(report, BZM_BRINGUP_BAD, BZM_BRINGUP_REASON_PREREQUISITE, 0, 0, 0, 1, 0, 0);
     }
     if (ops->balanced_batch_begin == NULL || ops->balanced_pair_commit == NULL || ops->balanced_batch_end == NULL ||
         ops->activation_barrier == NULL) {
-        return set_report(report, BZM_BRINGUP_BLOCKED, BZM_BRINGUP_REASON_BALANCED_PAIR_UNAVAILABLE, 0, 0, 0, 1, 0, 0);
+        return set_report(report, BZM_BRINGUP_BAD, BZM_BRINGUP_REASON_BALANCED_PAIR_UNAVAILABLE, 0, 0, 0, 1, 0, 0);
     }
     /* Validate every evidence capability before the first engine can be
      * activated. This preserves an all-or-nothing pre-activation block for
@@ -1059,14 +1011,14 @@ bzm_bringup_outcome_t bzm_bringup_stage_balanced_ramp(bzm_bringup_state_t * stat
         return set_report(report, BZM_BRINGUP_BAD, BZM_BRINGUP_REASON_INVALID_ARGUMENT, 0, 0, 0, 0, 0, 0);
     }
     if (ops->write_u32 == NULL || ops->read_u32 == NULL || ops->now_us == NULL || ops->telemetry_snapshot == NULL) {
-        return set_report(report, BZM_BRINGUP_BLOCKED, BZM_BRINGUP_REASON_CAPABILITY_UNAVAILABLE, 0, 0, 0, 0, 0, 0);
+        return set_report(report, BZM_BRINGUP_BAD, BZM_BRINGUP_REASON_CAPABILITY_UNAVAILABLE, 0, 0, 0, 0, 0, 0);
     }
 
-    /* BIRDS disables the result FSM before turning TDM off. Stage 6 pauses
+    /* BIRDS disables the result FSM before turning TDM off. engine activation pauses
      * TDM around every sentinel activation batch, so leaving result reports
      * enabled here permits raw, headerless eight-byte result/status packets
      * to escape while the framed transport is paused. Keep reports disabled
-     * for the complete ramp; Stage 7 enables them only after TDM is restored. */
+     * for the complete ramp; mining enables them only after TDM is restored. */
     const bzm_register_value_t result_reporting_disabled[] = {
         {BZM_LOCAL_REG_RESULT_STATUS_CONTROL, BZM_RESULT_REPORT_DISABLED},
     };
@@ -1119,27 +1071,24 @@ bzm_bringup_outcome_t bzm_bringup_stage_balanced_ramp(bzm_bringup_state_t * stat
                           BZM_TOPOLOGY_PAIR_COUNT * BZM_BRINGUP_ASIC_COUNT, completed, completed);
     }
 
-    state->balanced_ramp_verified = true;
+    state->engines_active = true;
     return set_report(report, BZM_BRINGUP_GOOD, BZM_BRINGUP_REASON_NONE, BZM_LAST_ASIC_ID, 0, 0,
                       BZM_TOPOLOGY_PAIR_COUNT * BZM_BRINGUP_ASIC_COUNT, completed, completed);
 }
 
-bzm_bringup_outcome_t bzm_bringup_check_running(bzm_bringup_state_t * state, const bzm_bringup_ops_t * ops, void * ops_context,
+bzm_bringup_outcome_t bzm_bringup_enable_results(bzm_bringup_state_t * state, const bzm_bringup_ops_t * ops, void * ops_context,
                                                 const bzm_bringup_telemetry_policy_t * telemetry_policy,
                                                 bzm_bringup_report_t * report)
 {
     if (state == NULL || ops == NULL || !telemetry_policy_is_valid(telemetry_policy)) {
         return set_report(report, BZM_BRINGUP_BAD, BZM_BRINGUP_REASON_INVALID_ARGUMENT, 0, 0, 0, 0, 0, 0);
     }
-    state->running_verified = false;
-    if (!state->balanced_ramp_verified) {
-        return set_report(report, BZM_BRINGUP_BLOCKED, BZM_BRINGUP_REASON_PREREQUISITE, 0, 0, 0, 1, 0, 0);
-    }
-    if (!topology_is_exact()) {
-        return set_report(report, BZM_BRINGUP_BAD, BZM_BRINGUP_REASON_TOPOLOGY, 0, 0, 0, BZM_TOPOLOGY_ENGINE_COUNT, 0, 0);
+    state->running = false;
+    if (!state->engines_active) {
+        return set_report(report, BZM_BRINGUP_BAD, BZM_BRINGUP_REASON_PREREQUISITE, 0, 0, 0, 1, 0, 0);
     }
     if (ops->write_u32 == NULL || ops->read_u32 == NULL || ops->now_us == NULL || ops->telemetry_snapshot == NULL) {
-        return set_report(report, BZM_BRINGUP_BLOCKED, BZM_BRINGUP_REASON_CAPABILITY_UNAVAILABLE, 0, 0, 0, 0, 0, 0);
+        return set_report(report, BZM_BRINGUP_BAD, BZM_BRINGUP_REASON_CAPABILITY_UNAVAILABLE, 0, 0, 0, 0, 0, 0);
     }
 
     /* TDM is now continuously enabled. Only at this boundary may the ASIC
@@ -1162,6 +1111,6 @@ bzm_bringup_outcome_t bzm_bringup_check_running(bzm_bringup_state_t * state, con
     if (outcome != BZM_BRINGUP_GOOD) {
         return outcome;
     }
-    state->running_verified = true;
+    state->running = true;
     return set_report(report, BZM_BRINGUP_GOOD, BZM_BRINGUP_REASON_NONE, BZM_LAST_ASIC_ID, 0, 0, 1, 1, BZM_BRINGUP_ASIC_COUNT);
 }

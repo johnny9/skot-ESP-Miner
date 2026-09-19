@@ -15,7 +15,7 @@
 #define BZM_TDM_RESULT_FRAME_SIZE (BZM_RESULT_FRAME_SIZE + 2)
 #define BZM_MAX_ENGINE_COUNT 4096
 #define BZM_VERSION_VARIANTS 4
-/* Qualified on the Bitaxe 1002 at the Stage-7 0x04 engine profile. Seven
+/* Qualified on the Bitaxe 1002 with the 0x04 engine profile. Seven
  * independent hardware results reproduced their ASIC 34-bit filter exactly
  * after subtracting 0x4c; the former 0x28 assumption reproduced none. */
 #define BZM_NONCE_GAP_1002 0x4cU
@@ -63,14 +63,8 @@ bool bzm_work_build(const bzm_work_ref_t *source, uint16_t engine_id,
 
 bool bzm_result_decode(const uint8_t frame[BZM_RESULT_FRAME_SIZE],
                        uint64_t timestamp_us, bzm_raw_result_t *result);
-bool bzm_tdm_result_decode(
-    const uint8_t frame[BZM_TDM_RESULT_FRAME_SIZE], uint64_t timestamp_us,
-    bzm_raw_result_t *result);
 bool bzm_raw_result_has_valid_nonce(const bzm_raw_result_t *result);
-bool bzm_engine_physical_id(uint16_t logical_engine_id,
-                            uint16_t *physical_engine_id);
 bool bzm_engine_logical_id(uint16_t physical_engine_id,
                            uint16_t *logical_engine_id);
-float bzm_temperature_from_code(uint16_t code);
 
 #endif // BZM_H

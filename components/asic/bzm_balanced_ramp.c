@@ -26,7 +26,7 @@ static bool addressed_write(void * context, uint16_t engine_id, uint8_t offset, 
 static bool ops_are_complete(const bzm_balanced_ramp_ops_t * ops)
 {
     return ops != NULL && ops->begin_engine != NULL && ops->write_register != NULL && ops->read_register != NULL &&
-           ops->delay_ms != NULL && ops->telemetry_sample != NULL && ops->parser_stats != NULL &&
+           ops->delay_ms != NULL && ops->telemetry_sample != NULL &&
            ops->final_barrier != NULL;
 }
 
@@ -37,52 +37,6 @@ static int asic_index(uint8_t asic_id)
         return -1;
     }
     return (int) index;
-}
-
-static bool parser_is_clean_relative_to(const bzm_serial_parser_stats_t * baseline,
-                                        const bzm_serial_parser_stats_t * current)
-{
-    return baseline != NULL && current != NULL && current->discarded_bytes == baseline->discarded_bytes &&
-           current->unexpected_register_headers == baseline->unexpected_register_headers &&
-           current->dropped_results == baseline->dropped_results &&
-           current->rejected_result_frames == baseline->rejected_result_frames &&
-           current->unmatched_register_frames == baseline->unmatched_register_frames &&
-           current->telemetry_decode_failures == baseline->telemetry_decode_failures && current->queued_results == 0;
-}
-
-bool bzm_balanced_ramp_parser_window_is_clean(const bzm_serial_parser_stats_t * baseline,
-                                              const bzm_serial_parser_stats_t * current)
-{
-    return parser_is_clean_relative_to(baseline, current) && current->discarded_bytes == baseline->discarded_bytes &&
-           current->buffered_bytes == 0;
-}
-
-bool bzm_balanced_ramp_accept_transition_discards(bzm_balanced_ramp_t * ramp,
-                                                  const bzm_serial_parser_stats_t * current)
-{
-    if (ramp == NULL || current == NULL || !ramp->baseline_captured ||
-        current->discarded_bytes < ramp->parser_baseline.discarded_bytes ||
-        current->unexpected_register_headers != ramp->parser_baseline.unexpected_register_headers ||
-        current->dropped_results != ramp->parser_baseline.dropped_results ||
-        current->rejected_result_frames != ramp->parser_baseline.rejected_result_frames ||
-        current->unmatched_register_frames != ramp->parser_baseline.unmatched_register_frames ||
-        current->telemetry_decode_failures != ramp->parser_baseline.telemetry_decode_failures ||
-        current->queued_results != 0) {
-        return false;
-    }
-    ramp->parser_baseline.discarded_bytes = current->discarded_bytes;
-    return true;
-}
-
-bool bzm_balanced_ramp_get_parser_baseline(const bzm_balanced_ramp_t * ramp,
-                                           bzm_serial_parser_stats_t * baseline)
-{
-    if (ramp == NULL || baseline == NULL || !ramp->baseline_captured || ramp->failed ||
-        ramp->parser_baseline.queued_results != 0) {
-        return false;
-    }
-    *baseline = ramp->parser_baseline;
-    return true;
 }
 
 static bool fail(bzm_balanced_ramp_t * ramp, bzm_balanced_ramp_failure_t failure, uint8_t asic_id, uint16_t engine_id,
@@ -117,7 +71,7 @@ static bool activate_engine(bzm_balanced_ramp_t * ramp, const bzm_balanced_ramp_
         return fail(ramp, BZM_BALANCED_RAMP_FAILURE_CONFIG_WRITE, asic_id, engine->physical_id, BZM_ENGINE_REG_CONFIG,
                     config, 0);
     }
-    if (!bzm_transport_program_stage6_sentinel(engine->physical_id, addressed_write, &writer)) {
+    if (!bzm_transport_program_startup_work(engine->physical_id, addressed_write, &writer)) {
         return fail(ramp, BZM_BALANCED_RAMP_FAILURE_SENTINEL_WRITE, asic_id, engine->physical_id, 0, 1, 0);
     }
 
@@ -200,8 +154,6 @@ const char * bzm_balanced_ramp_failure_name(bzm_balanced_ramp_failure_t failure)
         return "none";
     case BZM_BALANCED_RAMP_FAILURE_ARGUMENT:
         return "argument";
-    case BZM_BALANCED_RAMP_FAILURE_PARSER_BASELINE:
-        return "parser_baseline";
     case BZM_BALANCED_RAMP_FAILURE_TELEMETRY:
         return "telemetry";
     case BZM_BALANCED_RAMP_FAILURE_LEASE:
@@ -222,8 +174,6 @@ const char * bzm_balanced_ramp_failure_name(bzm_balanced_ramp_failure_t failure)
         return "incomplete";
     case BZM_BALANCED_RAMP_FAILURE_FINAL_BARRIER:
         return "final_barrier";
-    case BZM_BALANCED_RAMP_FAILURE_PARSER_FINAL:
-        return "parser_final";
     default:
         return "invalid";
     }
@@ -242,14 +192,6 @@ bool bzm_balanced_ramp_commit_pair(bzm_balanced_ramp_t * ramp, const bzm_balance
         pair->top.stack_index != pair->pair_index || ramp->next_pair[index] != pair->pair_index) {
         return fail(ramp, BZM_BALANCED_RAMP_FAILURE_ARGUMENT, asic_id, pair != NULL ? pair->bottom.physical_id : 0, 0, 1,
                     0);
-    }
-
-    if (!ramp->baseline_captured) {
-        if (!ops->parser_stats(ops_context, &ramp->parser_baseline) || ramp->parser_baseline.queued_results != 0) {
-            return fail(ramp, BZM_BALANCED_RAMP_FAILURE_PARSER_BASELINE, asic_id, 0, 0, 0,
-                        ramp->parser_baseline.queued_results);
-        }
-        ramp->baseline_captured = true;
     }
 
     if (!prepare_asic(ramp, ops, ops_context, asic_id, index)) {
@@ -279,7 +221,7 @@ bool bzm_balanced_ramp_commit_pair(bzm_balanced_ramp_t * ramp, const bzm_balance
 bool bzm_balanced_ramp_barrier(bzm_balanced_ramp_t * ramp, const bzm_balanced_ramp_ops_t * ops, void * ops_context,
                                size_t asic_count, size_t pairs_per_asic)
 {
-    if (ramp == NULL || !ops_are_complete(ops) || ramp->failed || !ramp->baseline_captured ||
+    if (ramp == NULL || !ops_are_complete(ops) || ramp->failed ||
         asic_count != BZM_BRINGUP_ASIC_COUNT || pairs_per_asic != BZM_TOPOLOGY_PAIR_COUNT ||
         ramp->completed_pairs != BZM_BRINGUP_ASIC_COUNT * BZM_TOPOLOGY_PAIR_COUNT ||
         ramp->completed_engines != BZM_BRINGUP_ASIC_COUNT * BZM_TOPOLOGY_ENGINE_COUNT) {
@@ -295,13 +237,8 @@ bool bzm_balanced_ramp_barrier(bzm_balanced_ramp_t * ramp, const bzm_balanced_ra
         }
     }
 
-    bzm_serial_parser_stats_t current = {0};
     if (!ops->final_barrier(ops_context)) {
         return fail(ramp, BZM_BALANCED_RAMP_FAILURE_FINAL_BARRIER, 0, 0, 0, 1, 0);
-    }
-    if (!ops->parser_stats(ops_context, &current) || !parser_is_clean_relative_to(&ramp->parser_baseline, &current)) {
-        return fail(ramp, BZM_BALANCED_RAMP_FAILURE_PARSER_FINAL, 0, 0, 0, 0,
-                    current.queued_results != 0 ? (uint32_t) current.queued_results : 1);
     }
     return true;
 }

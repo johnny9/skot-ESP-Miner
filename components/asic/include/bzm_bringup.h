@@ -18,7 +18,6 @@ typedef enum
 {
     BZM_BRINGUP_GOOD = 0,
     BZM_BRINGUP_BAD,
-    BZM_BRINGUP_BLOCKED,
 } bzm_bringup_outcome_t;
 
 typedef enum
@@ -65,11 +64,11 @@ typedef struct
 
 typedef struct
 {
-    bool chain_verified;
-    bool sensors_verified;
-    bool clocks_verified;
-    bool balanced_ramp_verified;
-    bool running_verified;
+    bool chain_initialized;
+    bool sensors_configured;
+    bool clocks_configured;
+    bool engines_active;
+    bool running;
     uint64_t sensors_configured_us;
     uint64_t clocks_configured_us;
     float clock_mhz;
@@ -144,16 +143,15 @@ void bzm_bringup_reference_sensor_profile(bzm_bringup_sensor_profile_t * profile
 void bzm_bringup_pll_800_profile(bzm_bringup_pll_profile_t * profile);
 uint32_t bzm_bringup_reference_tdm_control(void);
 
-const char * bzm_bringup_outcome_name(bzm_bringup_outcome_t outcome);
 const char * bzm_bringup_reason_name(bzm_bringup_reason_t reason);
 
-bzm_bringup_outcome_t bzm_bringup_stage_chain4(bzm_bringup_state_t * state, const bzm_bringup_ops_t * ops, void * ops_context,
+bzm_bringup_outcome_t bzm_bringup_discover_chain(bzm_bringup_state_t * state, const bzm_bringup_ops_t * ops, void * ops_context,
                                                bzm_bringup_report_t * report);
-bzm_bringup_outcome_t bzm_bringup_stage_sensors(bzm_bringup_state_t * state, const bzm_bringup_ops_t * ops, void * ops_context,
+bzm_bringup_outcome_t bzm_bringup_configure_sensors(bzm_bringup_state_t * state, const bzm_bringup_ops_t * ops, void * ops_context,
                                                 const bzm_bringup_sensor_profile_t * profile,
                                                 const bzm_bringup_telemetry_policy_t * telemetry_policy,
                                                 bzm_bringup_report_t * report);
-bzm_bringup_outcome_t bzm_bringup_stage_clocks(bzm_bringup_state_t * state, const bzm_bringup_ops_t * ops, void * ops_context,
+bzm_bringup_outcome_t bzm_bringup_configure_clocks(bzm_bringup_state_t * state, const bzm_bringup_ops_t * ops, void * ops_context,
                                                const bzm_bringup_pll_profile_t * profile,
                                                const bzm_bringup_telemetry_policy_t * telemetry_policy,
                                                bzm_bringup_report_t * report);
@@ -169,10 +167,10 @@ bzm_bringup_outcome_t bzm_bringup_live_frequency_domains_step(
     const float
         target_mhz[BZM_BRINGUP_ASIC_COUNT][BZM_BRINGUP_PLL_COUNT],
     bool allow_initial_jump, bzm_bringup_report_t *report);
-bzm_bringup_outcome_t bzm_bringup_stage_balanced_ramp(bzm_bringup_state_t * state, const bzm_bringup_ops_t * ops,
+bzm_bringup_outcome_t bzm_bringup_activate_engines(bzm_bringup_state_t * state, const bzm_bringup_ops_t * ops,
                                                       void * ops_context, const bzm_bringup_telemetry_policy_t * telemetry_policy,
                                                       bzm_bringup_report_t * report);
-bzm_bringup_outcome_t bzm_bringup_check_running(bzm_bringup_state_t * state, const bzm_bringup_ops_t * ops, void * ops_context,
+bzm_bringup_outcome_t bzm_bringup_enable_results(bzm_bringup_state_t * state, const bzm_bringup_ops_t * ops, void * ops_context,
                                                 const bzm_bringup_telemetry_policy_t * telemetry_policy,
                                                 bzm_bringup_report_t * report);
 

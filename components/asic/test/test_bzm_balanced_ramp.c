@@ -15,7 +15,6 @@ typedef struct
     size_t read_call_count;
     size_t delay_count;
     uint32_t total_delay_ms;
-    size_t stats_count;
     size_t final_count;
     uint16_t begun_engines[4];
     uint16_t write_engines[4];
@@ -30,8 +29,6 @@ typedef struct
     uint8_t status;
     size_t busy_after_reads;
     uint8_t config;
-    bzm_serial_parser_stats_t baseline;
-    bzm_serial_parser_stats_t current;
 } ramp_mock_t;
 
 static bool mock_begin(void * context, uint8_t asic_id, uint16_t engine_id)
@@ -109,13 +106,6 @@ static bool mock_telemetry(void * context, uint8_t asic_id, bzm_telemetry_sample
     return true;
 }
 
-static bool mock_stats(void * context, bzm_serial_parser_stats_t * stats)
-{
-    ramp_mock_t * mock = context;
-    *stats = mock->stats_count++ == 0 ? mock->baseline : mock->current;
-    return true;
-}
-
 static bool mock_final(void * context)
 {
     ramp_mock_t * mock = context;
@@ -129,7 +119,6 @@ static const bzm_balanced_ramp_ops_t MOCK_OPS = {
     .read_register = mock_read,
     .delay_ms = mock_delay,
     .telemetry_sample = mock_telemetry,
-    .parser_stats = mock_stats,
     .final_barrier = mock_final,
 };
 
@@ -149,7 +138,7 @@ static ramp_mock_t good_mock(void)
     };
 }
 
-TEST_CASE("BZM Stage 6 activates the higher-voltage stack first", "[asic][bzm][stage6]")
+TEST_CASE("BZM engine activation activates the higher-voltage stack first", "[asic][bzm][activation]")
 {
     ramp_mock_t mock = good_mock();
     bzm_balanced_ramp_t ramp;
@@ -186,7 +175,7 @@ TEST_CASE("BZM Stage 6 activates the higher-voltage stack first", "[asic][bzm][s
     TEST_ASSERT_EQUAL_UINT16(pair.bottom.physical_id, top_first.begun_engines[2]);
 }
 
-TEST_CASE("BZM Stage 6 fails closed when engine-domain reset cannot complete", "[asic][bzm][stage6]")
+TEST_CASE("BZM engine activation fails closed when engine-domain reset cannot complete", "[asic][bzm][activation]")
 {
     ramp_mock_t mock = good_mock();
     mock.fail_write_at = 1;
@@ -202,7 +191,7 @@ TEST_CASE("BZM Stage 6 fails closed when engine-domain reset cannot complete", "
     TEST_ASSERT_EQUAL_UINT16(0, ramp.completed_pairs);
 }
 
-TEST_CASE("BZM Stage 6 fails closed with at most one engine of pair skew", "[asic][bzm][stage6]")
+TEST_CASE("BZM engine activation fails closed with at most one engine of pair skew", "[asic][bzm][activation]")
 {
     ramp_mock_t mock = good_mock();
     mock.fail_begin_at = 2;
@@ -220,7 +209,7 @@ TEST_CASE("BZM Stage 6 fails closed with at most one engine of pair skew", "[asi
     TEST_ASSERT_EQUAL_UINT32(2, mock.begin_count);
 }
 
-TEST_CASE("BZM Stage 6 requires busy and enhanced config acknowledgement", "[asic][bzm][stage6]")
+TEST_CASE("BZM engine activation requires busy and enhanced config acknowledgement", "[asic][bzm][activation]")
 {
     bzm_engine_pair_t pair;
     TEST_ASSERT_TRUE(bzm_topology_balanced_pair_at(0, &pair));
@@ -254,7 +243,7 @@ TEST_CASE("BZM Stage 6 requires busy and enhanced config acknowledgement", "[asi
     TEST_ASSERT_TRUE(bzm_balanced_ramp_commit_pair(&ramp, &MOCK_OPS, &inactive_marker, BZM_BRINGUP_FIRST_ASIC_ID, &pair));
 }
 
-TEST_CASE("BZM Stage 6 accepts a bounded delayed busy acknowledgement", "[asic][bzm][stage6]")
+TEST_CASE("BZM engine activation accepts a bounded delayed busy acknowledgement", "[asic][bzm][activation]")
 {
     bzm_engine_pair_t pair;
     TEST_ASSERT_TRUE(bzm_topology_balanced_pair_at(0, &pair));
@@ -269,7 +258,7 @@ TEST_CASE("BZM Stage 6 accepts a bounded delayed busy acknowledgement", "[asic][
     TEST_ASSERT_EQUAL_UINT32(3, mock.total_delay_ms);
 }
 
-TEST_CASE("BZM Stage 6 retries a transient status timeout but rejects a continuous timeout", "[asic][bzm][stage6]")
+TEST_CASE("BZM engine activation retries a transient status timeout but rejects a continuous timeout", "[asic][bzm][activation]")
 {
     bzm_engine_pair_t pair;
     TEST_ASSERT_TRUE(bzm_topology_balanced_pair_at(0, &pair));
@@ -292,7 +281,7 @@ TEST_CASE("BZM Stage 6 retries a transient status timeout but rejects a continuo
     TEST_ASSERT_EQUAL_UINT16(0, ramp.completed_engines);
 }
 
-TEST_CASE("BZM Stage 6 barrier proves all 944 engines and clean sentinel output", "[asic][bzm][stage6]")
+TEST_CASE("BZM engine activation completes all 944 engines and the UART barrier", "[asic][bzm][activation]")
 {
     ramp_mock_t mock = good_mock();
     bzm_balanced_ramp_t ramp;
@@ -311,74 +300,8 @@ TEST_CASE("BZM Stage 6 barrier proves all 944 engines and clean sentinel output"
     TEST_ASSERT_TRUE(bzm_balanced_ramp_barrier(&ramp, &MOCK_OPS, &mock, BZM_BRINGUP_ASIC_COUNT,
                                                BZM_TOPOLOGY_PAIR_COUNT));
     TEST_ASSERT_EQUAL_UINT32(1, mock.final_count);
-}
-
-TEST_CASE("BZM Stage 6 rejects escaped sentinel results and parser faults", "[asic][bzm][stage6]")
-{
-    ramp_mock_t mock = good_mock();
-    mock.baseline.queued_results = 1;
-    bzm_balanced_ramp_t ramp;
-    bzm_engine_pair_t pair;
-    bzm_balanced_ramp_init(&ramp);
-    TEST_ASSERT_TRUE(bzm_topology_balanced_pair_at(0, &pair));
-    TEST_ASSERT_FALSE(bzm_balanced_ramp_commit_pair(&ramp, &MOCK_OPS, &mock, BZM_BRINGUP_FIRST_ASIC_ID, &pair));
-    TEST_ASSERT_EQUAL_UINT32(0, mock.begin_count);
-
-    mock = good_mock();
-    bzm_balanced_ramp_init(&ramp);
-    for (uint16_t pair_index = 0; pair_index < BZM_TOPOLOGY_PAIR_COUNT; ++pair_index) {
-        TEST_ASSERT_TRUE(bzm_topology_balanced_pair_at(pair_index, &pair));
-        for (uint8_t asic_index = 0; asic_index < BZM_BRINGUP_ASIC_COUNT; ++asic_index) {
-            TEST_ASSERT_TRUE(bzm_balanced_ramp_commit_pair(&ramp, &MOCK_OPS, &mock,
-                                                           bzm_asic_wire_ids[asic_index], &pair));
-        }
-    }
-    mock.current.queued_results = 1;
+    mock.final_result = false;
     TEST_ASSERT_FALSE(bzm_balanced_ramp_barrier(&ramp, &MOCK_OPS, &mock, BZM_BRINGUP_ASIC_COUNT,
-                                                BZM_TOPOLOGY_PAIR_COUNT));
+                                               BZM_TOPOLOGY_PAIR_COUNT));
     TEST_ASSERT_TRUE(ramp.failed);
-}
-
-TEST_CASE("BZM Stage 6 isolates controlled TDM discards from clean engine windows", "[asic][bzm][stage6]")
-{
-    bzm_serial_parser_stats_t baseline = {0};
-    bzm_serial_parser_stats_t current = {0};
-    TEST_ASSERT_TRUE(bzm_balanced_ramp_parser_window_is_clean(&baseline, &current));
-
-    current.discarded_bytes = 1;
-    TEST_ASSERT_FALSE(bzm_balanced_ramp_parser_window_is_clean(&baseline, &current));
-    current = baseline;
-    current.buffered_bytes = 1;
-    TEST_ASSERT_FALSE(bzm_balanced_ramp_parser_window_is_clean(&baseline, &current));
-    current = baseline;
-    current.queued_results = 1;
-    TEST_ASSERT_FALSE(bzm_balanced_ramp_parser_window_is_clean(&baseline, &current));
-
-    bzm_balanced_ramp_t ramp;
-    bzm_balanced_ramp_init(&ramp);
-    ramp.baseline_captured = true;
-    current = baseline;
-    current.discarded_bytes = 21;
-    current.buffered_bytes = 4;
-    TEST_ASSERT_TRUE(bzm_balanced_ramp_accept_transition_discards(&ramp, &current));
-    TEST_ASSERT_EQUAL_UINT32(21, ramp.parser_baseline.discarded_bytes);
-    bzm_serial_parser_stats_t accepted = {0};
-    TEST_ASSERT_TRUE(bzm_balanced_ramp_get_parser_baseline(&ramp, &accepted));
-    TEST_ASSERT_EQUAL_UINT32(21, accepted.discarded_bytes);
-    TEST_ASSERT_EQUAL_UINT32(0, accepted.unexpected_register_headers);
-
-    ramp.failed = true;
-    TEST_ASSERT_FALSE(bzm_balanced_ramp_get_parser_baseline(&ramp, &accepted));
-    ramp.failed = false;
-    TEST_ASSERT_FALSE(bzm_balanced_ramp_get_parser_baseline(NULL, &accepted));
-    TEST_ASSERT_FALSE(bzm_balanced_ramp_get_parser_baseline(&ramp, NULL));
-
-    current.discarded_bytes = 20;
-    TEST_ASSERT_FALSE(bzm_balanced_ramp_accept_transition_discards(&ramp, &current));
-    current.discarded_bytes = 21;
-    current.unexpected_register_headers = 1;
-    TEST_ASSERT_FALSE(bzm_balanced_ramp_accept_transition_discards(&ramp, &current));
-    current.unexpected_register_headers = 0;
-    current.queued_results = 1;
-    TEST_ASSERT_FALSE(bzm_balanced_ramp_accept_transition_discards(&ramp, &current));
 }

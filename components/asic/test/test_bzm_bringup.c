@@ -300,13 +300,13 @@ static bringup_mock_t good_mock(void)
 static void state_at_sensors(bzm_bringup_state_t * state)
 {
     bzm_bringup_init(state);
-    state->chain_verified = true;
+    state->chain_initialized = true;
 }
 
 static void state_at_clocks(bzm_bringup_state_t * state)
 {
     state_at_sensors(state);
-    state->sensors_verified = true;
+    state->sensors_configured = true;
 }
 
 static void state_at_live_frequency(bzm_bringup_state_t *state,
@@ -320,8 +320,8 @@ static void state_at_live_frequency(bzm_bringup_state_t *state,
         0.001f, frequency_mhz, frequency.actual_mhz);
 
     state_at_clocks(state);
-    state->clocks_verified = true;
-    state->running_verified = true;
+    state->clocks_configured = true;
+    state->running = true;
     state->clock_mhz = frequency_mhz;
     for (size_t asic = 0; asic < BZM_BRINGUP_ASIC_COUNT; ++asic) {
         for (size_t pll = 0; pll < BZM_BRINGUP_PLL_COUNT; ++pll) {
@@ -371,7 +371,6 @@ TEST_CASE("bzm bringup reference profiles are exact", "[bzm_bringup]")
     TEST_ASSERT_EQUAL_UINT16(128, pll.feedback_divider);
     TEST_ASSERT_EQUAL_HEX32(0x1242, pll.postdiv_register);
     TEST_ASSERT_EQUAL_HEX32(0x0000fec9, bzm_bringup_reference_tdm_control());
-    TEST_ASSERT_EQUAL_STRING("GOOD", bzm_bringup_outcome_name(BZM_BRINGUP_GOOD));
     TEST_ASSERT_EQUAL_STRING("balanced_pair_unavailable", bzm_bringup_reason_name(BZM_BRINGUP_REASON_BALANCED_PAIR_UNAVAILABLE));
     TEST_ASSERT_EQUAL_STRING("balanced_batch", bzm_bringup_reason_name(BZM_BRINGUP_REASON_BALANCED_BATCH));
 }
@@ -383,8 +382,8 @@ TEST_CASE("bzm chain4 proves the four spaced TDM IDs", "[bzm_bringup]")
     bzm_bringup_report_t report;
     bzm_bringup_init(&state);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_stage_chain4(&state, &MOCK_OPS, &mock, &report));
-    TEST_ASSERT_TRUE(state.chain_verified);
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_discover_chain(&state, &MOCK_OPS, &mock, &report));
+    TEST_ASSERT_TRUE(state.chain_initialized);
     TEST_ASSERT_EQUAL_UINT16(4, report.completed_items);
     TEST_ASSERT_EQUAL_UINT8(0, mock.unaddressed);
     TEST_ASSERT_EQUAL_UINT8(BZM_BRINGUP_ASIC_COUNT + 1, mock.broadcast_probe_count);
@@ -407,8 +406,8 @@ TEST_CASE("bzm chain4 bounds power-up NOOP retries before exact ID proof", "[bzm
     bzm_bringup_report_t report;
     bzm_bringup_init(&state);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_stage_chain4(&state, &MOCK_OPS, &mock, &report));
-    TEST_ASSERT_TRUE(state.chain_verified);
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_discover_chain(&state, &MOCK_OPS, &mock, &report));
+    TEST_ASSERT_TRUE(state.chain_initialized);
     TEST_ASSERT_EQUAL_UINT8(BZM_BRINGUP_ASIC_COUNT + 3, mock.broadcast_probe_count);
     TEST_ASSERT_EQUAL_UINT32((uint32_t) (started_us + 1200000U), (uint32_t) mock.now_us);
 }
@@ -422,12 +421,12 @@ TEST_CASE("bzm chain4 fails after bounded missing-chain retries", "[bzm_bringup]
     bzm_bringup_report_t report;
     bzm_bringup_init(&state);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_stage_chain4(&state, &MOCK_OPS, &mock, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_discover_chain(&state, &MOCK_OPS, &mock, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_CHAIN_MISSING, report.reason);
     TEST_ASSERT_EQUAL_UINT8(5, mock.broadcast_probe_count);
     TEST_ASSERT_EQUAL_UINT16(0, report.completed_items);
     TEST_ASSERT_EQUAL_UINT32((uint32_t) (started_us + 800000U), (uint32_t) mock.now_us);
-    TEST_ASSERT_FALSE(state.chain_verified);
+    TEST_ASSERT_FALSE(state.chain_initialized);
 }
 
 TEST_CASE("bzm chain4 rejects an ID readback mismatch", "[bzm_bringup]")
@@ -441,10 +440,10 @@ TEST_CASE("bzm chain4 rejects an ID readback mismatch", "[bzm_bringup]")
     bzm_bringup_report_t report;
     bzm_bringup_init(&state);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_stage_chain4(&state, &MOCK_OPS, &mock, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_discover_chain(&state, &MOCK_OPS, &mock, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_CHAIN_ID_MISMATCH, report.reason);
     TEST_ASSERT_EQUAL_HEX8(0x1e, report.asic_id);
-    TEST_ASSERT_FALSE(state.chain_verified);
+    TEST_ASSERT_FALSE(state.chain_initialized);
 }
 
 TEST_CASE("bzm chain4 requires the hardware chain-status readback bit", "[bzm_bringup]")
@@ -458,11 +457,11 @@ TEST_CASE("bzm chain4 requires the hardware chain-status readback bit", "[bzm_br
     bzm_bringup_report_t report;
     bzm_bringup_init(&state);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_stage_chain4(&state, &MOCK_OPS, &mock, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_discover_chain(&state, &MOCK_OPS, &mock, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_CHAIN_ID_MISMATCH, report.reason);
     TEST_ASSERT_EQUAL_HEX32(BZM_BRINGUP_FIRST_ASIC_ID | 0x100U, report.expected);
     TEST_ASSERT_EQUAL_HEX32(BZM_BRINGUP_FIRST_ASIC_ID, report.actual);
-    TEST_ASSERT_FALSE(state.chain_verified);
+    TEST_ASSERT_FALSE(state.chain_initialized);
 }
 
 TEST_CASE("bzm chain4 rejects a fifth unaddressed ASIC", "[bzm_bringup]")
@@ -473,9 +472,9 @@ TEST_CASE("bzm chain4 rejects a fifth unaddressed ASIC", "[bzm_bringup]")
     bzm_bringup_report_t report;
     bzm_bringup_init(&state);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_stage_chain4(&state, &MOCK_OPS, &mock, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_discover_chain(&state, &MOCK_OPS, &mock, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_CHAIN_EXTRA_ASIC, report.reason);
-    TEST_ASSERT_FALSE(state.chain_verified);
+    TEST_ASSERT_FALSE(state.chain_initialized);
 }
 
 TEST_CASE("bzm sensors write and read back every ASIC then require fresh telemetry", "[bzm_bringup]")
@@ -488,9 +487,9 @@ TEST_CASE("bzm sensors write and read back every ASIC then require fresh telemet
     state_at_sensors(&state);
     bzm_bringup_reference_sensor_profile(&profile);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_stage_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
-    TEST_ASSERT_TRUE(state.sensors_verified);
-    TEST_ASSERT_FALSE(state.clocks_verified);
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_configure_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
+    TEST_ASSERT_TRUE(state.sensors_configured);
+    TEST_ASSERT_FALSE(state.clocks_configured);
     TEST_ASSERT_EQUAL_UINT16(1, mock.all_asic_write_count);
     TEST_ASSERT_EQUAL_HEX32(0x44464444, mock.registers[0][BZM_LOCAL_REG_IO_PEPS_DRIVE_STRENGTH]);
     for (size_t index = 1; index < BZM_BRINGUP_ASIC_COUNT; ++index) {
@@ -526,7 +525,7 @@ TEST_CASE("bzm sensors finish all readback before enabling TDM traffic", "[bzm_b
     state_at_sensors(&state);
     bzm_bringup_reference_sensor_profile(&profile);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_stage_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_configure_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
     TEST_ASSERT_EQUAL_UINT16(1, mock.all_asic_write_count);
     TEST_ASSERT_EQUAL_UINT16(0, mock.reads_while_tdm_active);
     for (size_t index = 0; index < BZM_BRINGUP_ASIC_COUNT; ++index) {
@@ -545,12 +544,12 @@ TEST_CASE("bzm sensors fail closed when the synchronized TDM start fails", "[bzm
     state_at_sensors(&state);
     bzm_bringup_reference_sensor_profile(&profile);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_stage_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_configure_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_IO, report.reason);
     TEST_ASSERT_EQUAL_HEX8(BZM_ALL_ASICS, report.asic_id);
     TEST_ASSERT_EQUAL_HEX8(BZM_LOCAL_REG_UART_TDM_CONTROL, report.register_offset);
     TEST_ASSERT_EQUAL_UINT16(1, mock.all_asic_write_count);
-    TEST_ASSERT_FALSE(state.sensors_verified);
+    TEST_ASSERT_FALSE(state.sensors_configured);
 }
 
 TEST_CASE("bzm sensors require the BIRDS first-ASIC drive-strength readback", "[bzm_bringup]")
@@ -567,14 +566,14 @@ TEST_CASE("bzm sensors require the BIRDS first-ASIC drive-strength readback", "[
     state_at_sensors(&state);
     bzm_bringup_reference_sensor_profile(&profile);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_stage_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_configure_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_REGISTER_READBACK, report.reason);
     TEST_ASSERT_EQUAL_HEX8(BZM_FIRST_ASIC_ID, report.asic_id);
     TEST_ASSERT_EQUAL_HEX8(BZM_LOCAL_REG_IO_PEPS_DRIVE_STRENGTH, report.register_offset);
     TEST_ASSERT_EQUAL_HEX32(0x44464444, report.expected);
     TEST_ASSERT_EQUAL_HEX32(0, report.actual);
     TEST_ASSERT_EQUAL_UINT16(0, mock.all_asic_write_count);
-    TEST_ASSERT_FALSE(state.sensors_verified);
+    TEST_ASSERT_FALSE(state.sensors_configured);
 }
 
 TEST_CASE("bzm sensors reject a TDM slot count that cannot reach wire IDs 10 through 40", "[bzm_bringup]")
@@ -588,7 +587,7 @@ TEST_CASE("bzm sensors reject a TDM slot count that cannot reach wire IDs 10 thr
     bzm_bringup_reference_sensor_profile(&profile);
     profile.tdm_slot_count = BZM_BRINGUP_ASIC_COUNT;
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_stage_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_configure_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_INVALID_ARGUMENT, report.reason);
     TEST_ASSERT_EQUAL_UINT16(0, mock.write_count);
 }
@@ -603,7 +602,7 @@ TEST_CASE("bzm sensors are blocked until chain4 is good", "[bzm_bringup]")
     bzm_bringup_init(&state);
     bzm_bringup_reference_sensor_profile(&profile);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BLOCKED, bzm_bringup_stage_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_configure_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_PREREQUISITE, report.reason);
     TEST_ASSERT_EQUAL_UINT16(0, mock.write_count);
 }
@@ -622,10 +621,10 @@ TEST_CASE("bzm sensors fail on per ASIC register readback", "[bzm_bringup]")
     state_at_sensors(&state);
     bzm_bringup_reference_sensor_profile(&profile);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_stage_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_configure_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_REGISTER_READBACK, report.reason);
     TEST_ASSERT_EQUAL_HEX8(0x28, report.asic_id);
-    TEST_ASSERT_FALSE(state.sensors_verified);
+    TEST_ASSERT_FALSE(state.sensors_configured);
 }
 
 TEST_CASE("bzm sensors reject telemetry captured before configuration", "[bzm_bringup]")
@@ -639,7 +638,7 @@ TEST_CASE("bzm sensors reject telemetry captured before configuration", "[bzm_br
     state_at_sensors(&state);
     bzm_bringup_reference_sensor_profile(&profile);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_stage_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_configure_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_TELEMETRY_PRECONFIG, report.reason);
     TEST_ASSERT_EQUAL_UINT16(5, mock.telemetry_snapshot_count);
 }
@@ -655,8 +654,8 @@ TEST_CASE("bzm sensors retry a queued pre-configuration sample", "[bzm_bringup]"
     state_at_sensors(&state);
     bzm_bringup_reference_sensor_profile(&profile);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_stage_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
-    TEST_ASSERT_TRUE(state.sensors_verified);
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_configure_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
+    TEST_ASSERT_TRUE(state.sensors_configured);
     TEST_ASSERT_EQUAL_UINT16(2, mock.telemetry_snapshot_count);
 }
 
@@ -672,8 +671,8 @@ TEST_CASE("bzm sensors ignore one CH2 excursion only after a fresh recovery samp
     state_at_sensors(&state);
     bzm_bringup_reference_sensor_profile(&profile);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_stage_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
-    TEST_ASSERT_TRUE(state.sensors_verified);
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_configure_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
+    TEST_ASSERT_TRUE(state.sensors_configured);
     TEST_ASSERT_EQUAL_UINT16(2, mock.telemetry_snapshot_count);
 }
 
@@ -689,13 +688,13 @@ TEST_CASE("bzm sensors reject a continuous CH2 excursion at the configured count
     state_at_sensors(&state);
     bzm_bringup_reference_sensor_profile(&profile);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_stage_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_configure_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_TELEMETRY_UNSAFE, report.reason);
     TEST_ASSERT_EQUAL_HEX8(0x14, report.asic_id);
     TEST_ASSERT_EQUAL_UINT32(3, report.expected);
     TEST_ASSERT_EQUAL_UINT32(3, report.actual);
     TEST_ASSERT_EQUAL_UINT16(3, mock.telemetry_snapshot_count);
-    TEST_ASSERT_FALSE(state.sensors_verified);
+    TEST_ASSERT_FALSE(state.sensors_configured);
 }
 
 TEST_CASE("bzm sensors qualify a transient CH2 excursion with voltage-fault bit", "[bzm_bringup]")
@@ -711,8 +710,8 @@ TEST_CASE("bzm sensors qualify a transient CH2 excursion with voltage-fault bit"
     state_at_sensors(&state);
     bzm_bringup_reference_sensor_profile(&profile);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_stage_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
-    TEST_ASSERT_TRUE(state.sensors_verified);
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_configure_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
+    TEST_ASSERT_TRUE(state.sensors_configured);
     TEST_ASSERT_EQUAL_UINT16(2, mock.telemetry_snapshot_count);
 }
 
@@ -729,13 +728,13 @@ TEST_CASE("bzm sensors reject continuous CH2 excursions with voltage-fault bit",
     state_at_sensors(&state);
     bzm_bringup_reference_sensor_profile(&profile);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_stage_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_configure_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_TELEMETRY_UNSAFE, report.reason);
     TEST_ASSERT_EQUAL_HEX8(0x0a, report.asic_id);
     TEST_ASSERT_EQUAL_UINT32(3, report.expected);
     TEST_ASSERT_EQUAL_UINT32(3, report.actual);
     TEST_ASSERT_EQUAL_UINT16(3, mock.telemetry_snapshot_count);
-    TEST_ASSERT_FALSE(state.sensors_verified);
+    TEST_ASSERT_FALSE(state.sensors_configured);
 }
 
 TEST_CASE("bzm sensors keep trip faults immediate while CH2 confirmation is enabled", "[bzm_bringup]")
@@ -750,7 +749,7 @@ TEST_CASE("bzm sensors keep trip faults immediate while CH2 confirmation is enab
     state_at_sensors(&state);
     bzm_bringup_reference_sensor_profile(&profile);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_stage_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_configure_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_TELEMETRY_UNSAFE, report.reason);
     TEST_ASSERT_EQUAL_HEX8(0x1e, report.asic_id);
     TEST_ASSERT_EQUAL_UINT16(1, mock.telemetry_snapshot_count);
@@ -769,7 +768,7 @@ TEST_CASE("bzm sensors allow configuration to restore immediate CH2 shutdown", "
     state_at_sensors(&state);
     bzm_bringup_reference_sensor_profile(&profile);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_stage_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_configure_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
     TEST_ASSERT_EQUAL_HEX8(0x28, report.asic_id);
     TEST_ASSERT_EQUAL_UINT16(1, mock.telemetry_snapshot_count);
 }
@@ -786,7 +785,7 @@ TEST_CASE("bzm sensors require telemetry from every ASIC", "[bzm_bringup]")
     state_at_sensors(&state);
     bzm_bringup_reference_sensor_profile(&profile);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_stage_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_configure_sensors(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_TELEMETRY_MISSING, report.reason);
     TEST_ASSERT_EQUAL_HEX8(0x14, report.asic_id);
     TEST_ASSERT_EQUAL_UINT16(5, mock.telemetry_snapshot_count);
@@ -802,8 +801,8 @@ TEST_CASE("bzm clocks configure both 800 MHz PLLs symmetrically", "[bzm_bringup]
     state_at_clocks(&state);
     bzm_bringup_pll_800_profile(&profile);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_stage_clocks(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
-    TEST_ASSERT_TRUE(state.clocks_verified);
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_configure_clocks(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
+    TEST_ASSERT_TRUE(state.clocks_configured);
     TEST_ASSERT_EQUAL_UINT16(2, mock.all_asic_write_count);
     for (size_t index = 0; index < BZM_BRINGUP_ASIC_COUNT; ++index) {
         TEST_ASSERT_EQUAL_HEX32(128, mock.registers[index][BZM_LOCAL_REG_PLL0_FBDIV]);
@@ -828,7 +827,7 @@ TEST_CASE("bzm clocks quiesce every TDM sender before control readback", "[bzm_b
     state_at_clocks(&state);
     bzm_bringup_pll_800_profile(&profile);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_stage_clocks(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_configure_clocks(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
     TEST_ASSERT_EQUAL_UINT16(2, mock.all_asic_write_count);
     for (size_t index = 0; index < BZM_BRINGUP_ASIC_COUNT; ++index) {
         TEST_ASSERT_EQUAL_HEX32(0x0000fec9, mock.registers[index][BZM_LOCAL_REG_UART_TDM_CONTROL]);
@@ -847,11 +846,11 @@ TEST_CASE("bzm clocks fail if either PLL does not lock", "[bzm_bringup]")
     bzm_bringup_pll_800_profile(&profile);
     profile.lock_attempts = 2;
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_stage_clocks(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_configure_clocks(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_PLL_UNLOCKED, report.reason);
     TEST_ASSERT_EQUAL_HEX8(0x1e, report.asic_id);
     TEST_ASSERT_EQUAL_UINT8(1, report.pll_index);
-    TEST_ASSERT_FALSE(state.clocks_verified);
+    TEST_ASSERT_FALSE(state.clocks_configured);
 }
 
 TEST_CASE("bzm clocks require fresh recovery from one combined-lock frame anomaly", "[bzm_bringup]")
@@ -866,9 +865,9 @@ TEST_CASE("bzm clocks require fresh recovery from one combined-lock frame anomal
     state_at_clocks(&state);
     bzm_bringup_pll_800_profile(&profile);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_stage_clocks(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_configure_clocks(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
     TEST_ASSERT_EQUAL_UINT16(2, mock.telemetry_snapshot_count);
-    TEST_ASSERT_TRUE(state.clocks_verified);
+    TEST_ASSERT_TRUE(state.clocks_configured);
 }
 
 TEST_CASE("bzm clocks reject continuous combined-lock frame anomalies", "[bzm_bringup]")
@@ -883,13 +882,13 @@ TEST_CASE("bzm clocks reject continuous combined-lock frame anomalies", "[bzm_br
     state_at_clocks(&state);
     bzm_bringup_pll_800_profile(&profile);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_stage_clocks(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_configure_clocks(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_TELEMETRY_UNSAFE, report.reason);
     TEST_ASSERT_EQUAL_HEX8(0x14, report.asic_id);
     TEST_ASSERT_EQUAL_UINT32(3, report.expected);
     TEST_ASSERT_EQUAL_UINT32(3, report.actual);
     TEST_ASSERT_EQUAL_UINT16(3, mock.telemetry_snapshot_count);
-    TEST_ASSERT_FALSE(state.clocks_verified);
+    TEST_ASSERT_FALSE(state.clocks_configured);
 }
 
 TEST_CASE("bzm clocks reject an asymmetric PLL readback", "[bzm_bringup]")
@@ -906,7 +905,7 @@ TEST_CASE("bzm clocks reject an asymmetric PLL readback", "[bzm_bringup]")
     state_at_clocks(&state);
     bzm_bringup_pll_800_profile(&profile);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_stage_clocks(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_configure_clocks(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_REGISTER_READBACK, report.reason);
     TEST_ASSERT_EQUAL_HEX8(0x14, report.asic_id);
     TEST_ASSERT_EQUAL_UINT8(1, report.pll_index);
@@ -927,7 +926,7 @@ TEST_CASE("bzm clocks reprove sensor TDM controls after PLL programming", "[bzm_
     state_at_clocks(&state);
     bzm_bringup_pll_800_profile(&profile);
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_stage_clocks(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_configure_clocks(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_REGISTER_READBACK, report.reason);
     TEST_ASSERT_EQUAL_HEX8(0x1e, report.asic_id);
     TEST_ASSERT_EQUAL_HEX8(BZM_LOCAL_REG_SENSOR_CLOCK_DIVIDER, report.register_offset);
@@ -945,7 +944,7 @@ TEST_CASE("bzm clocks reject any profile other than exact 800 MHz", "[bzm_bringu
     bzm_bringup_pll_800_profile(&profile);
     profile.target_mhz = 799;
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_stage_clocks(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_configure_clocks(&state, &MOCK_OPS, &mock, &profile, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_INVALID_ARGUMENT, report.reason);
     TEST_ASSERT_EQUAL_UINT16(0, mock.write_count);
 }
@@ -1062,7 +1061,7 @@ TEST_CASE("bzm live ramp rejects oversized and asymmetric shortcut steps",
     state_at_live_frequency(&state, &mock, 800.0f);
     fill_live_frequency_targets(targets, 850.0f);
     TEST_ASSERT_EQUAL(
-        BZM_BRINGUP_BLOCKED,
+        BZM_BRINGUP_BAD,
         bzm_bringup_live_frequency_domains_step(
             &state, &MOCK_OPS, &mock, targets, false, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_INVALID_ARGUMENT, report.reason);
@@ -1071,7 +1070,7 @@ TEST_CASE("bzm live ramp rejects oversized and asymmetric shortcut steps",
     fill_live_frequency_targets(targets, 1400.0f);
     targets[3][1] = 1375.0f;
     TEST_ASSERT_EQUAL(
-        BZM_BRINGUP_BLOCKED,
+        BZM_BRINGUP_BAD,
         bzm_bringup_live_frequency_domains_step(
             &state, &MOCK_OPS, &mock, targets, true, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_INVALID_ARGUMENT, report.reason);
@@ -1079,7 +1078,7 @@ TEST_CASE("bzm live ramp rejects oversized and asymmetric shortcut steps",
 
     fill_live_frequency_targets(targets, 1450.0f);
     TEST_ASSERT_EQUAL(
-        BZM_BRINGUP_BLOCKED,
+        BZM_BRINGUP_BAD,
         bzm_bringup_live_frequency_domains_step(
             &state, &MOCK_OPS, &mock, targets, true, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_INVALID_ARGUMENT, report.reason);
@@ -1117,17 +1116,17 @@ TEST_CASE("bzm balanced ramp is blocked without the sequential pair adapter", "[
     bzm_bringup_report_t report;
     bzm_bringup_telemetry_policy_t policy = telemetry_policy();
     state_at_clocks(&state);
-    state.clocks_verified = true;
+    state.clocks_configured = true;
     bzm_bringup_ops_t serial_only = MOCK_OPS;
     serial_only.balanced_batch_begin = NULL;
     serial_only.balanced_pair_commit = NULL;
     serial_only.balanced_batch_end = NULL;
     serial_only.activation_barrier = NULL;
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BLOCKED, bzm_bringup_stage_balanced_ramp(&state, &serial_only, &mock, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_activate_engines(&state, &serial_only, &mock, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_BALANCED_PAIR_UNAVAILABLE, report.reason);
     TEST_ASSERT_EQUAL_UINT16(0, mock.pair_commit_count);
-    TEST_ASSERT_FALSE(state.balanced_ramp_verified);
+    TEST_ASSERT_FALSE(state.engines_active);
 }
 
 TEST_CASE("bzm balanced ramp commits all 236 engines as bounded-skew stack pairs", "[bzm_bringup]")
@@ -1137,10 +1136,10 @@ TEST_CASE("bzm balanced ramp commits all 236 engines as bounded-skew stack pairs
     bzm_bringup_report_t report;
     bzm_bringup_telemetry_policy_t policy = telemetry_policy();
     state_at_clocks(&state);
-    state.clocks_verified = true;
+    state.clocks_configured = true;
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_stage_balanced_ramp(&state, &MOCK_OPS, &mock, &policy, &report));
-    TEST_ASSERT_TRUE(state.balanced_ramp_verified);
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_activate_engines(&state, &MOCK_OPS, &mock, &policy, &report));
+    TEST_ASSERT_TRUE(state.engines_active);
     TEST_ASSERT_EQUAL_UINT16(BZM_TOPOLOGY_PAIR_COUNT, mock.batch_begin_count);
     TEST_ASSERT_EQUAL_UINT16(BZM_TOPOLOGY_PAIR_COUNT, mock.batch_end_count);
     TEST_ASSERT_FALSE(mock.batch_active);
@@ -1162,10 +1161,10 @@ TEST_CASE("bzm balanced ramp requires fresh recovery from one combined-lock fram
     bzm_bringup_report_t report;
     bzm_bringup_telemetry_policy_t policy = telemetry_policy();
     state_at_clocks(&state);
-    state.clocks_verified = true;
+    state.clocks_configured = true;
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_stage_balanced_ramp(&state, &MOCK_OPS, &mock, &policy, &report));
-    TEST_ASSERT_TRUE(state.balanced_ramp_verified);
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_activate_engines(&state, &MOCK_OPS, &mock, &policy, &report));
+    TEST_ASSERT_TRUE(state.engines_active);
     TEST_ASSERT_EQUAL_UINT16(118U * 4U, mock.pair_commit_count);
     TEST_ASSERT_EQUAL_UINT16(BZM_TOPOLOGY_PAIR_COUNT + 1U, mock.telemetry_snapshot_count);
 }
@@ -1179,16 +1178,16 @@ TEST_CASE("bzm balanced ramp rejects continuous same-ASIC combined-lock frame an
     bzm_bringup_report_t report;
     bzm_bringup_telemetry_policy_t policy = telemetry_policy();
     state_at_clocks(&state);
-    state.clocks_verified = true;
+    state.clocks_configured = true;
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_stage_balanced_ramp(&state, &MOCK_OPS, &mock, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_activate_engines(&state, &MOCK_OPS, &mock, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_TELEMETRY_UNSAFE, report.reason);
     TEST_ASSERT_EQUAL_HEX8(0x0a, report.asic_id);
     TEST_ASSERT_EQUAL_UINT32(3, report.expected);
     TEST_ASSERT_EQUAL_UINT32(3, report.actual);
     TEST_ASSERT_EQUAL_UINT16(BZM_BRINGUP_ASIC_COUNT, report.completed_items);
     TEST_ASSERT_EQUAL_UINT16(3, mock.telemetry_snapshot_count);
-    TEST_ASSERT_FALSE(state.balanced_ramp_verified);
+    TEST_ASSERT_FALSE(state.engines_active);
 }
 
 TEST_CASE("bzm balanced ramp disables and verifies result reports before activation", "[bzm_bringup]")
@@ -1202,16 +1201,16 @@ TEST_CASE("bzm balanced ramp disables and verifies result reports before activat
     bzm_bringup_report_t report;
     bzm_bringup_telemetry_policy_t policy = telemetry_policy();
     state_at_clocks(&state);
-    state.clocks_verified = true;
+    state.clocks_configured = true;
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_stage_balanced_ramp(&state, &MOCK_OPS, &mock, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_activate_engines(&state, &MOCK_OPS, &mock, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_REGISTER_READBACK, report.reason);
     TEST_ASSERT_EQUAL_HEX8(0x1e, report.asic_id);
     TEST_ASSERT_EQUAL_HEX8(BZM_LOCAL_REG_RESULT_STATUS_CONTROL, report.register_offset);
     TEST_ASSERT_EQUAL_UINT32(1, report.expected);
     TEST_ASSERT_EQUAL_UINT32(0, report.actual);
     TEST_ASSERT_EQUAL_UINT16(0, mock.pair_commit_count);
-    TEST_ASSERT_FALSE(state.balanced_ramp_verified);
+    TEST_ASSERT_FALSE(state.engines_active);
 }
 
 TEST_CASE("bzm balanced ramp fails closed before activation when a batch cannot begin", "[bzm_bringup]")
@@ -1222,14 +1221,14 @@ TEST_CASE("bzm balanced ramp fails closed before activation when a batch cannot 
     bzm_bringup_report_t report;
     bzm_bringup_telemetry_policy_t policy = telemetry_policy();
     state_at_clocks(&state);
-    state.clocks_verified = true;
+    state.clocks_configured = true;
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_stage_balanced_ramp(&state, &MOCK_OPS, &mock, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_activate_engines(&state, &MOCK_OPS, &mock, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_BALANCED_BATCH, report.reason);
     TEST_ASSERT_EQUAL_UINT16(0, report.completed_items);
     TEST_ASSERT_EQUAL_UINT16(0, mock.pair_commit_count);
     TEST_ASSERT_FALSE(mock.batch_active);
-    TEST_ASSERT_FALSE(state.balanced_ramp_verified);
+    TEST_ASSERT_FALSE(state.engines_active);
 }
 
 TEST_CASE("bzm balanced ramp fails closed when telemetry cannot resume after a batch", "[bzm_bringup]")
@@ -1240,14 +1239,14 @@ TEST_CASE("bzm balanced ramp fails closed when telemetry cannot resume after a b
     bzm_bringup_report_t report;
     bzm_bringup_telemetry_policy_t policy = telemetry_policy();
     state_at_clocks(&state);
-    state.clocks_verified = true;
+    state.clocks_configured = true;
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_stage_balanced_ramp(&state, &MOCK_OPS, &mock, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_activate_engines(&state, &MOCK_OPS, &mock, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_BALANCED_BATCH, report.reason);
     TEST_ASSERT_EQUAL_UINT16(BZM_BRINGUP_ASIC_COUNT, report.completed_items);
     TEST_ASSERT_EQUAL_UINT16(BZM_BRINGUP_ASIC_COUNT, mock.pair_commit_count);
     TEST_ASSERT_TRUE(mock.batch_active);
-    TEST_ASSERT_FALSE(state.balanced_ramp_verified);
+    TEST_ASSERT_FALSE(state.engines_active);
 }
 
 TEST_CASE("bzm balanced ramp rejects telemetry captured before each pair batch", "[bzm_bringup]")
@@ -1258,15 +1257,15 @@ TEST_CASE("bzm balanced ramp rejects telemetry captured before each pair batch",
     bzm_bringup_report_t report;
     bzm_bringup_telemetry_policy_t policy = telemetry_policy();
     state_at_clocks(&state);
-    state.clocks_verified = true;
+    state.clocks_configured = true;
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_stage_balanced_ramp(&state, &MOCK_OPS, &mock, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_activate_engines(&state, &MOCK_OPS, &mock, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_TELEMETRY_PRECONFIG, report.reason);
     TEST_ASSERT_EQUAL_UINT16(BZM_BRINGUP_ASIC_COUNT, mock.pair_commit_count);
     TEST_ASSERT_EQUAL_UINT16(BZM_BRINGUP_ASIC_COUNT, report.completed_items);
     TEST_ASSERT_EQUAL_UINT16(5, mock.telemetry_snapshot_count);
     TEST_ASSERT_EQUAL_UINT16(0, mock.barrier_count);
-    TEST_ASSERT_FALSE(state.balanced_ramp_verified);
+    TEST_ASSERT_FALSE(state.engines_active);
 }
 
 TEST_CASE("bzm balanced ramp requires the final activation barrier", "[bzm_bringup]")
@@ -1277,12 +1276,12 @@ TEST_CASE("bzm balanced ramp requires the final activation barrier", "[bzm_bring
     bzm_bringup_report_t report;
     bzm_bringup_telemetry_policy_t policy = telemetry_policy();
     state_at_clocks(&state);
-    state.clocks_verified = true;
+    state.clocks_configured = true;
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_stage_balanced_ramp(&state, &MOCK_OPS, &mock, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_activate_engines(&state, &MOCK_OPS, &mock, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_ACTIVATION_BARRIER, report.reason);
     TEST_ASSERT_EQUAL_UINT16(118U * 4U, mock.pair_commit_count);
-    TEST_ASSERT_FALSE(state.balanced_ramp_verified);
+    TEST_ASSERT_FALSE(state.engines_active);
 }
 
 TEST_CASE("bzm running requires post clock fresh safe telemetry", "[bzm_bringup]")
@@ -1292,25 +1291,25 @@ TEST_CASE("bzm running requires post clock fresh safe telemetry", "[bzm_bringup]
     bzm_bringup_report_t report;
     bzm_bringup_telemetry_policy_t policy = telemetry_policy();
     state_at_clocks(&state);
-    state.clocks_verified = true;
+    state.clocks_configured = true;
     state.clocks_configured_us = mock.now_us;
-    state.balanced_ramp_verified = true;
+    state.engines_active = true;
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_check_running(&state, &MOCK_OPS, &mock, &policy, &report));
-    TEST_ASSERT_TRUE(state.running_verified);
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_enable_results(&state, &MOCK_OPS, &mock, &policy, &report));
+    TEST_ASSERT_TRUE(state.running);
     for (uint8_t index = 0; index < BZM_BRINGUP_ASIC_COUNT; ++index) {
         TEST_ASSERT_EQUAL_HEX32(0, mock.registers[index][BZM_LOCAL_REG_RESULT_STATUS_CONTROL]);
     }
 
     mock.telemetry_unsafe = true;
     mock.telemetry_unsafe_id = 0x14;
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_check_running(&state, &MOCK_OPS, &mock, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_enable_results(&state, &MOCK_OPS, &mock, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_TELEMETRY_UNSAFE, report.reason);
     TEST_ASSERT_EQUAL_HEX8(0x14, report.asic_id);
-    TEST_ASSERT_FALSE(state.running_verified);
+    TEST_ASSERT_FALSE(state.running);
 }
 
-TEST_CASE("bzm running verifies result reporting is enabled only after Stage 6", "[bzm_bringup]")
+TEST_CASE("bzm running verifies result reporting is enabled only after engine activation", "[bzm_bringup]")
 {
     bringup_mock_t mock = good_mock();
     for (uint8_t index = 0; index < BZM_BRINGUP_ASIC_COUNT; ++index) {
@@ -1324,17 +1323,17 @@ TEST_CASE("bzm running verifies result reporting is enabled only after Stage 6",
     bzm_bringup_report_t report;
     bzm_bringup_telemetry_policy_t policy = telemetry_policy();
     state_at_clocks(&state);
-    state.clocks_verified = true;
+    state.clocks_configured = true;
     state.clocks_configured_us = mock.now_us;
-    state.balanced_ramp_verified = true;
+    state.engines_active = true;
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_check_running(&state, &MOCK_OPS, &mock, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_enable_results(&state, &MOCK_OPS, &mock, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_REGISTER_READBACK, report.reason);
     TEST_ASSERT_EQUAL_HEX8(0x14, report.asic_id);
     TEST_ASSERT_EQUAL_HEX8(BZM_LOCAL_REG_RESULT_STATUS_CONTROL, report.register_offset);
     TEST_ASSERT_EQUAL_UINT32(0, report.expected);
     TEST_ASSERT_EQUAL_UINT32(1, report.actual);
-    TEST_ASSERT_FALSE(state.running_verified);
+    TEST_ASSERT_FALSE(state.running);
 }
 
 TEST_CASE("bzm running requires a fresh recovery after one PLL status-frame anomaly", "[bzm_bringup]")
@@ -1346,13 +1345,13 @@ TEST_CASE("bzm running requires a fresh recovery after one PLL status-frame anom
     bzm_bringup_report_t report;
     bzm_bringup_telemetry_policy_t policy = telemetry_policy();
     state_at_clocks(&state);
-    state.clocks_verified = true;
+    state.clocks_configured = true;
     state.clocks_configured_us = mock.now_us;
-    state.balanced_ramp_verified = true;
+    state.engines_active = true;
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_check_running(&state, &MOCK_OPS, &mock, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_GOOD, bzm_bringup_enable_results(&state, &MOCK_OPS, &mock, &policy, &report));
     TEST_ASSERT_EQUAL_UINT16(2, mock.telemetry_snapshot_count);
-    TEST_ASSERT_TRUE(state.running_verified);
+    TEST_ASSERT_TRUE(state.running);
 }
 
 TEST_CASE("bzm running rejects a continuous PLL status-frame anomaly", "[bzm_bringup]")
@@ -1364,17 +1363,17 @@ TEST_CASE("bzm running rejects a continuous PLL status-frame anomaly", "[bzm_bri
     bzm_bringup_report_t report;
     bzm_bringup_telemetry_policy_t policy = telemetry_policy();
     state_at_clocks(&state);
-    state.clocks_verified = true;
+    state.clocks_configured = true;
     state.clocks_configured_us = mock.now_us;
-    state.balanced_ramp_verified = true;
+    state.engines_active = true;
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_check_running(&state, &MOCK_OPS, &mock, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_enable_results(&state, &MOCK_OPS, &mock, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_TELEMETRY_UNSAFE, report.reason);
     TEST_ASSERT_EQUAL_HEX8(0x14, report.asic_id);
     TEST_ASSERT_EQUAL_UINT32(3, report.expected);
     TEST_ASSERT_EQUAL_UINT32(3, report.actual);
     TEST_ASSERT_EQUAL_UINT16(3, mock.telemetry_snapshot_count);
-    TEST_ASSERT_FALSE(state.running_verified);
+    TEST_ASSERT_FALSE(state.running);
 }
 
 TEST_CASE("bzm running keeps a PLL anomaly with trip immediate", "[bzm_bringup]")
@@ -1388,14 +1387,14 @@ TEST_CASE("bzm running keeps a PLL anomaly with trip immediate", "[bzm_bringup]"
     bzm_bringup_report_t report;
     bzm_bringup_telemetry_policy_t policy = telemetry_policy();
     state_at_clocks(&state);
-    state.clocks_verified = true;
+    state.clocks_configured = true;
     state.clocks_configured_us = mock.now_us;
-    state.balanced_ramp_verified = true;
+    state.engines_active = true;
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_check_running(&state, &MOCK_OPS, &mock, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_enable_results(&state, &MOCK_OPS, &mock, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_TELEMETRY_UNSAFE, report.reason);
     TEST_ASSERT_EQUAL_UINT16(1, mock.telemetry_snapshot_count);
-    TEST_ASSERT_FALSE(state.running_verified);
+    TEST_ASSERT_FALSE(state.running);
 }
 
 TEST_CASE("bzm running is blocked until balanced ramp is good", "[bzm_bringup]")
@@ -1405,9 +1404,9 @@ TEST_CASE("bzm running is blocked until balanced ramp is good", "[bzm_bringup]")
     bzm_bringup_report_t report;
     bzm_bringup_telemetry_policy_t policy = telemetry_policy();
     state_at_clocks(&state);
-    state.clocks_verified = true;
+    state.clocks_configured = true;
 
-    TEST_ASSERT_EQUAL(BZM_BRINGUP_BLOCKED, bzm_bringup_check_running(&state, &MOCK_OPS, &mock, &policy, &report));
+    TEST_ASSERT_EQUAL(BZM_BRINGUP_BAD, bzm_bringup_enable_results(&state, &MOCK_OPS, &mock, &policy, &report));
     TEST_ASSERT_EQUAL(BZM_BRINGUP_REASON_PREREQUISITE, report.reason);
-    TEST_ASSERT_FALSE(state.running_verified);
+    TEST_ASSERT_FALSE(state.running);
 }

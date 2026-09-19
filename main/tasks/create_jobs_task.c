@@ -12,6 +12,7 @@
 #include "esp_timer.h"
 
 #include "asic.h"
+#include "bzm_driver.h"
 #include "system.h"
 #include "esp_heap_caps.h"
 #include "utils.h"
@@ -53,6 +54,7 @@ void create_jobs_task(void *pvParameters)
     // before any task that touches them can run.
 
     uint32_t current_version_mask = 0;
+    double bzm_pool_difficulty = 0;
     miner_job_t *current_work = NULL;
     bool current_work_sent = false;
     uint64_t extranonce_2 = 0;
@@ -72,6 +74,14 @@ void create_jobs_task(void *pvParameters)
         if (notified == pdTRUE) {
             miner_job_t *new_work = miner_job_get_slot((size_t)slot_notify);
             ESP_LOGI(TAG, "New Work Activated (slot %lu) %s (type %d)", (unsigned long)slot_notify, new_work->job_id, new_work->type);
+            if (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id == BZM) {
+                /* BZM retains work independently for each engine. Retire it
+                 * when the pool clears jobs or activates a different target,
+                 * and refill the engines at the driver's fast cadence. */
+                if (new_work->clean_jobs || new_work->pool_diff != bzm_pool_difficulty)
+                    (void)BZM_clear_work(GLOBAL_STATE);
+                bzm_pool_difficulty = new_work->pool_diff;
+            }
             current_work = new_work;
             GLOBAL_STATE->active_job_slot_idx = (uint8_t)(slot_notify % MINER_JOB_POOL_SIZE);
             current_work_sent = false;

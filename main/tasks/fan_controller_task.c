@@ -137,8 +137,13 @@ void FAN_CONTROLLER_task(void * pvParameters)
             }
         }
 
-        power_management->fan_rpm = Thermal_get_fan_speed(&GLOBAL_STATE->DEVICE_CONFIG);
-        power_management->fan2_rpm = Thermal_get_fan2_speed(&GLOBAL_STATE->DEVICE_CONFIG);
+        /* Bonanza's board monitor publishes RPM from its safety sample.
+         * Another tach request occupies the bridge for 500 ms and delays
+         * mining lease renewals and engine replacement. */
+        if (!bonanza) {
+            power_management->fan_rpm = Thermal_get_fan_speed(&GLOBAL_STATE->DEVICE_CONFIG);
+            power_management->fan2_rpm = Thermal_get_fan2_speed(&GLOBAL_STATE->DEVICE_CONFIG);
+        }
 
         if (bonanza) BONANZA_POWER_MANAGEMENT_board_io_end();
         vTaskDelayUntil(&taskWakeTime, POLL_TIME_MS / portTICK_PERIOD_MS);

@@ -24,6 +24,11 @@ is deliberately separate from the upstream TPS546 configuration structure.
 This duplicates regulator implementation code to avoid widening that shared
 interface. UART buffering is likewise isolated in `bzm_serial`.
 
+Production timing, filter and safety limits are fixed constants in the owning
+implementation files, preserving the original production defaults. The board
+and driver share only the telemetry freshness limit. No BZM/Bonanza Kconfig
+settings are added; local nonce difficulty derives from the ASIC result filter.
+
 Existing pause, resume, firmware OTA and restart routes delegate to the board
 owner on Bonanza. Self-test waits for board startup and delegates shutdown.
 Bonanza uses the existing headless display mode; external display support is

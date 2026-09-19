@@ -7,6 +7,9 @@
 
 #include "bzm_frame_parser.h"
 
+/* Shared by board safety checks and the driver's temperature reader. Allows
+ * bounded parser recovery; trip indications still require immediate shutdown. */
+#define BZM_TELEMETRY_MAX_AGE_US UINT64_C(2000000)
 #define BZM_CH2_CONFIRM_MAX_SAMPLES 10U
 
 typedef struct

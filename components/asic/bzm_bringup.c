@@ -14,6 +14,8 @@ enum
     BZM_REFERENCE_TDM_SLOT_COUNT = 100,
     BZM_REFERENCE_TDM_DELAY = 1,
     BZM_REFERENCE_SENSOR_DIVIDER = 8,
+    /* About 6.2 reports per second per ASIC, within the 2-second age limit. */
+    BZM_REFERENCE_SENSOR_TDM_GAP_COUNT = 63,
     BZM_REFERENCE_THRESHOLD_COUNT = 10,
     BZM_RESULT_REPORT_ENABLED = 0,
     BZM_RESULT_REPORT_DISABLED = 1,
@@ -103,7 +105,7 @@ void bzm_bringup_reference_sensor_profile(bzm_bringup_sensor_profile_t * profile
         .tdm_slot_count = BZM_REFERENCE_TDM_SLOT_COUNT,
         .tdm_delay = BZM_REFERENCE_TDM_DELAY,
         .sensor_clock_divider = BZM_REFERENCE_SENSOR_DIVIDER,
-        .tdm_gap_count = CONFIG_BZM_1002_SENSOR_TDM_GAP_COUNT,
+        .tdm_gap_count = BZM_REFERENCE_SENSOR_TDM_GAP_COUNT,
         .thermal_threshold_count = BZM_REFERENCE_THRESHOLD_COUNT,
         .voltage_threshold_count = BZM_REFERENCE_THRESHOLD_COUNT,
         .thermal_trip_code = BZM_REFERENCE_THERMAL_TRIP_CODE_115C,
@@ -694,7 +696,7 @@ bzm_bringup_outcome_t bzm_bringup_stage_clocks(bzm_bringup_state_t * state, cons
             {BZM_LOCAL_REG_SLOW_CLOCK_DIVIDER, BZM_REFERENCE_SLOW_CLOCK_DIVIDER},
             {BZM_LOCAL_REG_TDM_DELAY, BZM_REFERENCE_TDM_DELAY},
             {BZM_LOCAL_REG_UART_TX, 0x0f},
-            {BZM_LOCAL_REG_SENSOR_TDM_GAP_COUNT, CONFIG_BZM_1002_SENSOR_TDM_GAP_COUNT},
+            {BZM_LOCAL_REG_SENSOR_TDM_GAP_COUNT, BZM_REFERENCE_SENSOR_TDM_GAP_COUNT},
             {BZM_LOCAL_REG_SENSOR_CLOCK_DIVIDER, (BZM_REFERENCE_SENSOR_DIVIDER << 5) | BZM_REFERENCE_SENSOR_DIVIDER},
         };
         for (size_t item = 0; item < sizeof(sensor_controls) / sizeof(sensor_controls[0]); ++item) {

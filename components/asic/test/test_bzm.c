@@ -224,7 +224,7 @@ TEST_CASE("BZM work builder derives four family-private midstates",
     };
     bzm_work_t work;
     TEST_ASSERT_TRUE(bzm_work_build(
-        &source, 7, 5, 16, CONFIG_BZM_1002_LEAD_ZEROS, true, &work));
+        &source, 7, 5, 16, 36, true, &work));
     TEST_ASSERT_EQUAL_UINT16(7, work.engine_id);
     TEST_ASSERT_EQUAL_UINT8(5, work.logical_sequence);
     TEST_ASSERT_EQUAL_UINT8(4, work.midstate_count);
@@ -474,14 +474,14 @@ TEST_CASE("BZM transport programs ordered enhanced work and flush jobs",
     };
     bzm_work_t work;
     TEST_ASSERT_TRUE(bzm_work_build(
-        &source, 7, 5, 16, CONFIG_BZM_1002_LEAD_ZEROS, true, &work));
+        &source, 7, 5, 16, 36, true, &work));
 
     register_capture_t capture = {0};
     TEST_ASSERT_TRUE(bzm_transport_program_work(
         &work, capture_register, &capture));
     TEST_ASSERT_EQUAL_UINT32(16, capture.count);
     TEST_ASSERT_EQUAL_HEX8(0x49, capture.writes[0].offset);
-    TEST_ASSERT_EQUAL_UINT8(CONFIG_BZM_1002_LEAD_ZEROS - 32,
+    TEST_ASSERT_EQUAL_UINT8(4,
                             capture.writes[0].data[0]);
     TEST_ASSERT_EQUAL_HEX8(0x90, capture.writes[1].data[0]);
     static const uint8_t expected_merkle_residue[] = {0x23, 0x22, 0x21, 0x20};

@@ -34,6 +34,36 @@
 #define BZM_IO_TASK_PRIORITY 18U
 #define BZM_FREQUENCY_TRANSITION_PROOF_TIMEOUT_MS 30000U
 
+/* Initial proof and recovery require locally validated nonces; raw rejection
+ * streaks are diagnostics, not independent evidence of a safety failure. */
+#define BZM_PROOF_TIMEOUT_MS 15000U
+#define BZM_RESULT_RECOVERY_TIMEOUT_MS 5000U
+#define BZM_MIN_VALID_RESULTS 1U
+#define BZM_MAX_LOCAL_REJECTIONS 1U
+#define BZM_MAX_MAPPING_REJECTIONS 2U
+
+/* Recovery needs two clean 500 ms windows and must settle within 20 health
+ * observations (10 seconds), with at most 256 discarded bytes. */
+#define BZM_PARSER_REALIGN_MAX_DISCARDS 256U
+#define BZM_PARSER_REALIGN_CLEAN_WINDOWS 2U
+#define BZM_PARSER_REALIGN_MAX_WINDOWS 20U
+#define BZM_PARSER_REALIGN_MAX_EVENTS 20U
+
+/* Board 1002 safety limits. Fan, rail-discharge and stack-voltage thresholds
+ * remain provisional until qualified against production hardware. CH2 is an
+ * inter-stack differential, not a third stack rail. */
+#define BZM_FAN_MIN_RPM 1000U
+#define BZM_SAFE_OFF_VCORE_MV 250U
+#define BZM_TEMP_MIN_C (-20)
+#define BZM_TEMP_MAX_C 75
+#define BZM_STACK_MV_MIN 300U
+#define BZM_STACK_MV_MAX 800U
+#define BZM_INTERSTACK_DIFF_ABS_MAX_MV 50U
+#define BZM_STACK_MAX_SPREAD_MV 100U
+/* Confirm noisy CH2/combined-PLL samples; trips and other faults act at once. */
+#define BZM_CH2_CONFIRM_SAMPLES 3U
+#define BZM_PLL_LOCK_CONFIRM_SAMPLES 3U
+
 typedef struct
 {
     pthread_mutex_t lock;
@@ -129,12 +159,12 @@ static bzm_running_evidence_config_t running_evidence_config(void)
 {
     return (bzm_running_evidence_config_t){
         .required_chip_engine_writes = BZM_ENGINES_PER_ASIC * BZM_BRINGUP_ASIC_COUNT,
-        .minimum_valid_results = CONFIG_BZM_1002_MIN_VALID_RESULTS,
+        .minimum_valid_results = BZM_MIN_VALID_RESULTS,
         .allow_mapping_recovery = true,
-        .maximum_mapping_rejections = CONFIG_BZM_1002_MAX_MAPPING_REJECTIONS,
-        .maximum_local_rejections = CONFIG_BZM_1002_MAX_LOCAL_REJECTIONS,
-        .proof_timeout_ms = CONFIG_BZM_1002_PROOF_TIMEOUT_SECONDS * 1000U,
-        .recovery_timeout_ms = CONFIG_BZM_1002_RESULT_RECOVERY_TIMEOUT_MS,
+        .maximum_mapping_rejections = BZM_MAX_MAPPING_REJECTIONS,
+        .maximum_local_rejections = BZM_MAX_LOCAL_REJECTIONS,
+        .proof_timeout_ms = BZM_PROOF_TIMEOUT_MS,
+        .recovery_timeout_ms = BZM_RESULT_RECOVERY_TIMEOUT_MS,
     };
 }
 
@@ -200,7 +230,7 @@ static bzm_running_evidence_result_t evaluate_running_evidence_locked(uint64_t c
         RUNTIME.parser_realign.recovering) {
         snprintf(RUNTIME.running_evidence.detail, sizeof(RUNTIME.running_evidence.detail),
                  "proof retained; bounded parser realignment clean windows %u/%u",
-                 (unsigned) RUNTIME.parser_realign.clean_windows, (unsigned) CONFIG_BZM_1002_PARSER_REALIGN_CLEAN_WINDOWS);
+                 (unsigned) RUNTIME.parser_realign.clean_windows, (unsigned) BZM_PARSER_REALIGN_CLEAN_WINDOWS);
     }
     if (RUNTIME.running_evidence.status == BZM_RUNNING_EVIDENCE_GOOD) {
         snprintf(RUNTIME.supervisor.report.stages[BZM_STAGE_RUNNING].detail,
@@ -342,7 +372,7 @@ static bzm_runtime_health_result_t sample_runtime_health_locked(void)
         .require_independent_kill =
             RUNTIME.supervisor.config.production_mode && !RUNTIME.supervisor.config.board_managed_safety &&
             RUNTIME.supervisor.report.reached_stage >= BZM_STAGE_POWER_RAIL,
-        .fan_min_rpm = CONFIG_BZM_1002_FAN_MIN_RPM,
+        .fan_min_rpm = BZM_FAN_MIN_RPM,
         .require_fan_full =
             RUNTIME.supervisor.report.reached_stage < BZM_STAGE_RUNNING,
         .tps_bounds =
@@ -444,9 +474,9 @@ static bzm_runtime_health_result_t sample_runtime_health_locked(void)
     uint32_t parser_realign_unexpected_registers = 0;
     if (input.holding && input.reached_stage == BZM_STAGE_RUNNING && input.parser_stats_available && RUNTIME.parser_realign_valid) {
         parser_realign_result = bzm_parser_realign_observe(
-            &RUNTIME.parser_realign, &input.parser_current, CONFIG_BZM_1002_PARSER_REALIGN_MAX_DISCARDS,
-            CONFIG_BZM_1002_PARSER_REALIGN_CLEAN_WINDOWS, CONFIG_BZM_1002_PARSER_REALIGN_MAX_WINDOWS,
-            CONFIG_BZM_1002_PARSER_REALIGN_MAX_EVENTS);
+            &RUNTIME.parser_realign, &input.parser_current, BZM_PARSER_REALIGN_MAX_DISCARDS,
+            BZM_PARSER_REALIGN_CLEAN_WINDOWS, BZM_PARSER_REALIGN_MAX_WINDOWS,
+            BZM_PARSER_REALIGN_MAX_EVENTS);
         if (RUNTIME.parser_realign.recovering || parser_realign_result == BZM_PARSER_REALIGN_RECOVERED) {
             parser_realign_discarded = input.parser_current.discarded_bytes - RUNTIME.parser_realign.burst_discard_baseline;
             parser_realign_unexpected_registers = input.parser_current.unexpected_register_headers -
@@ -465,7 +495,7 @@ static bzm_runtime_health_result_t sample_runtime_health_locked(void)
             RUNTIME.parser_recovery_count++;
             ESP_LOGW(TAG, "Mining parser realigned after %lu discarded bytes and %lu rejected register headers; valid frame resumed and %u clean windows passed",
                      (unsigned long) parser_realign_discarded, (unsigned long) parser_realign_unexpected_registers,
-                     (unsigned) CONFIG_BZM_1002_PARSER_REALIGN_CLEAN_WINDOWS);
+                     (unsigned) BZM_PARSER_REALIGN_CLEAN_WINDOWS);
         }
     }
 
@@ -496,12 +526,12 @@ static bzm_runtime_health_result_t sample_runtime_health_locked(void)
     if (RUNTIME.health.status == BZM_RUNTIME_HEALTH_GOOD && parser_realign_result == BZM_PARSER_REALIGN_PENDING) {
         snprintf(RUNTIME.health.detail, sizeof(RUNTIME.health.detail),
                  "Mining parser realignment pending: discarded=%lu/%u rejectedHeaders=%lu bursts=%u/%u cleanWindows=%u/%u windows=%u/%u",
-                 (unsigned long) parser_realign_discarded, (unsigned) CONFIG_BZM_1002_PARSER_REALIGN_MAX_DISCARDS,
+                 (unsigned long) parser_realign_discarded, (unsigned) BZM_PARSER_REALIGN_MAX_DISCARDS,
                  (unsigned long) parser_realign_unexpected_registers,
                  (unsigned) RUNTIME.parser_realign.episode_bursts,
-                 (unsigned) CONFIG_BZM_1002_PARSER_REALIGN_MAX_EVENTS,
-                 (unsigned) RUNTIME.parser_realign.clean_windows, (unsigned) CONFIG_BZM_1002_PARSER_REALIGN_CLEAN_WINDOWS,
-                 (unsigned) RUNTIME.parser_realign.observed_windows, (unsigned) CONFIG_BZM_1002_PARSER_REALIGN_MAX_WINDOWS);
+                 (unsigned) BZM_PARSER_REALIGN_MAX_EVENTS,
+                 (unsigned) RUNTIME.parser_realign.clean_windows, (unsigned) BZM_PARSER_REALIGN_CLEAN_WINDOWS,
+                 (unsigned) RUNTIME.parser_realign.observed_windows, (unsigned) BZM_PARSER_REALIGN_MAX_WINDOWS);
     } else if (RUNTIME.health.status == BZM_RUNTIME_HEALTH_GOOD && parser_realign_result == BZM_PARSER_REALIGN_RECOVERED) {
         snprintf(RUNTIME.health.detail, sizeof(RUNTIME.health.detail),
                  "Mining parser realigned: discarded=%lu rejectedHeaders=%lu valid frame resumed cleanWindows=%u",
@@ -514,7 +544,7 @@ static bzm_runtime_health_result_t sample_runtime_health_locked(void)
         uint8_t observed_samples = 0;
         bzm_ch2_confirmation_result_t confirmation = bzm_pll_lock_confirmation_observe(
             &RUNTIME.pll_lock_confirmation, &input.telemetry, input.telemetry_now_us, input.telemetry_max_age_us,
-            CONFIG_BZM_1002_PLL_LOCK_CONFIRM_SAMPLES, &culprit_asic_id, &observed_samples);
+            BZM_PLL_LOCK_CONFIRM_SAMPLES, &culprit_asic_id, &observed_samples);
         if (confirmation == BZM_CH2_CONFIRMATION_CONTINUOUS || confirmation == BZM_CH2_CONFIRMATION_INVALID) {
             RUNTIME.health.status = BZM_RUNTIME_HEALTH_BAD;
             RUNTIME.health.fault = BZM_RUNTIME_HEALTH_FAULT_TELEMETRY_CLOCK_UNLOCKED;
@@ -522,7 +552,7 @@ static bzm_runtime_health_result_t sample_runtime_health_locked(void)
                 snprintf(RUNTIME.health.detail, sizeof(RUNTIME.health.detail),
                          "ASIC 0x%02x combined PLL lock clear continuously for %u/%u fresh samples",
                          (unsigned) culprit_asic_id, (unsigned) observed_samples,
-                         (unsigned) CONFIG_BZM_1002_PLL_LOCK_CONFIRM_SAMPLES);
+                         (unsigned) BZM_PLL_LOCK_CONFIRM_SAMPLES);
             } else {
                 snprintf(RUNTIME.health.detail, sizeof(RUNTIME.health.detail),
                          "combined PLL lock confirmation input is invalid");
@@ -534,7 +564,7 @@ static bzm_runtime_health_result_t sample_runtime_health_locked(void)
                          ? "ASIC 0x%02x combined PLL lock clear pending a fresh sample at %u/%u"
                          : "ASIC 0x%02x combined PLL lock clear pending confirmation at %u/%u",
                      (unsigned) culprit_asic_id, (unsigned) observed_samples,
-                     (unsigned) CONFIG_BZM_1002_PLL_LOCK_CONFIRM_SAMPLES);
+                     (unsigned) BZM_PLL_LOCK_CONFIRM_SAMPLES);
         }
     }
     if (RUNTIME.health.status == BZM_RUNTIME_HEALTH_GOOD && input.holding && input.reached_stage >= BZM_STAGE_SENSORS &&
@@ -543,7 +573,7 @@ static bzm_runtime_health_result_t sample_runtime_health_locked(void)
         uint8_t observed_samples = 0;
         bzm_ch2_confirmation_result_t confirmation =
             bzm_ch2_confirmation_observe(&RUNTIME.ch2_confirmation, &input.telemetry, &input.telemetry_bounds,
-                                         CONFIG_BZM_1002_CH2_CONFIRM_SAMPLES, &culprit_asic_id, &observed_samples);
+                                         BZM_CH2_CONFIRM_SAMPLES, &culprit_asic_id, &observed_samples);
         if (confirmation == BZM_CH2_CONFIRMATION_CONTINUOUS || confirmation == BZM_CH2_CONFIRMATION_INVALID) {
             RUNTIME.health.status = BZM_RUNTIME_HEALTH_BAD;
             RUNTIME.health.fault = BZM_RUNTIME_HEALTH_FAULT_TELEMETRY_BOUNDS;
@@ -551,7 +581,7 @@ static bzm_runtime_health_result_t sample_runtime_health_locked(void)
                 const bzm_telemetry_sample_t * sample = bzm_telemetry_store_get(&input.telemetry, culprit_asic_id);
                 snprintf(RUNTIME.health.detail, sizeof(RUNTIME.health.detail),
                          "ASIC 0x%02x CH2 excursion continuous for %u/%u fresh samples: %.1f mV limit=+/-%.1f mV",
-                         (unsigned) culprit_asic_id, (unsigned) observed_samples, (unsigned) CONFIG_BZM_1002_CH2_CONFIRM_SAMPLES,
+                         (unsigned) culprit_asic_id, (unsigned) observed_samples, (unsigned) BZM_CH2_CONFIRM_SAMPLES,
                          sample != NULL ? sample->ch2_mv : NAN, input.telemetry_bounds.ch2_abs_max_mv);
             } else {
                 snprintf(RUNTIME.health.detail, sizeof(RUNTIME.health.detail), "CH2 confirmation input is invalid");
@@ -562,7 +592,7 @@ static bzm_runtime_health_result_t sample_runtime_health_locked(void)
                      confirmation == BZM_CH2_CONFIRMATION_NO_NEW_SAMPLE
                          ? "ASIC 0x%02x CH2 excursion pending a fresh sample at %u/%u"
                          : "ASIC 0x%02x CH2 excursion pending confirmation at %u/%u",
-                     (unsigned) culprit_asic_id, (unsigned) observed_samples, (unsigned) CONFIG_BZM_1002_CH2_CONFIRM_SAMPLES);
+                     (unsigned) culprit_asic_id, (unsigned) observed_samples, (unsigned) BZM_CH2_CONFIRM_SAMPLES);
         }
     }
     RUNTIME.health_valid = true;
@@ -646,7 +676,7 @@ static bzm_stage_result_t runtime_force_safe_off(void * context)
     bool electrical_safe = false;
     for (uint32_t waited = 0; waited <= BZM_SAFE_OFF_TIMEOUT_MS; waited += BZM_SAFE_OFF_SAMPLE_MS) {
         if (BONANZA_VCORE_bzm_snapshot(&power, &pgood) == ESP_OK && !pgood && (power.operation & OPERATION_ON) == 0 &&
-            power.read_vout * 1000.0f <= (float) CONFIG_BZM_1002_SAFE_OFF_VCORE_MV) {
+            power.read_vout * 1000.0f <= (float) BZM_SAFE_OFF_VCORE_MV) {
             electrical_safe = true;
             break;
         }
@@ -729,7 +759,7 @@ static bzm_stage_result_t run_controls(GlobalState * state)
         return bzm_validation_result(BZM_CHECK_BAD, BZM_VALIDATION_CODE_STAGE_FAILED, "bridge arm/heartbeat lease proof failed");
     }
     if (Thermal_set_fan_percent(&state->DEVICE_CONFIG, 1.0f) != ESP_OK || BZM_bridge_get_fan_rpm(&RUNTIME.fan_rpm) != ESP_OK ||
-        RUNTIME.fan_rpm < CONFIG_BZM_1002_FAN_MIN_RPM) {
+        RUNTIME.fan_rpm < BZM_FAN_MIN_RPM) {
         (void) BZM_bridge_disarm_safety(&status);
         return bzm_validation_result(BZM_CHECK_BAD, BZM_VALIDATION_CODE_STAGE_FAILED,
                                      "fan full-speed command or fresh tach threshold failed");
@@ -801,17 +831,17 @@ static bzm_bringup_telemetry_policy_t telemetry_policy(void)
     return (bzm_bringup_telemetry_policy_t){
         .bounds =
             {
-                .temperature_min_c = (float) CONFIG_BZM_1002_TEMP_MIN_C,
-                .temperature_max_c = (float) CONFIG_BZM_1002_TEMP_MAX_C,
-                .ch0_min_mv = (float) CONFIG_BZM_1002_STACK_MV_MIN,
-                .ch0_max_mv = (float) CONFIG_BZM_1002_STACK_MV_MAX,
-                .ch1_min_mv = (float) CONFIG_BZM_1002_STACK_MV_MIN,
-                .ch1_max_mv = (float) CONFIG_BZM_1002_STACK_MV_MAX,
-                .ch2_abs_max_mv = (float) CONFIG_BZM_1002_INTERSTACK_DIFF_ABS_MAX_MV,
-                .max_stack_spread_mv = (float) CONFIG_BZM_1002_STACK_MAX_SPREAD_MV,
+                .temperature_min_c = (float) BZM_TEMP_MIN_C,
+                .temperature_max_c = (float) BZM_TEMP_MAX_C,
+                .ch0_min_mv = (float) BZM_STACK_MV_MIN,
+                .ch0_max_mv = (float) BZM_STACK_MV_MAX,
+                .ch1_min_mv = (float) BZM_STACK_MV_MIN,
+                .ch1_max_mv = (float) BZM_STACK_MV_MAX,
+                .ch2_abs_max_mv = (float) BZM_INTERSTACK_DIFF_ABS_MAX_MV,
+                .max_stack_spread_mv = (float) BZM_STACK_MAX_SPREAD_MV,
             },
-        .max_age_us = (uint64_t) CONFIG_BZM_1002_TELEMETRY_MAX_AGE_MS * 1000U,
-        .ch2_confirm_samples = CONFIG_BZM_1002_CH2_CONFIRM_SAMPLES,
+        .max_age_us = BZM_TELEMETRY_MAX_AGE_US,
+        .ch2_confirm_samples = BZM_CH2_CONFIRM_SAMPLES,
     };
 }
 

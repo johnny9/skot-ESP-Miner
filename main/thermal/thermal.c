@@ -19,6 +19,8 @@ static const char * TAG = "thermal";
 #define BM1373_TEMP_SCALE 0.9613546f
 #define BM1373_TEMP_OFFSET (-5.0858026f)
 #define NAJA_DUO_DIODE2_TEMP_OFFSET (-10.7f)
+/* Bonanza fan floor while mining; the board owner forces full speed otherwise. */
+#define BONANZA_FAN_MIN_PERCENT 36U
 
 esp_err_t Thermal_init(DeviceConfig * DEVICE_CONFIG)
 {
@@ -74,7 +76,7 @@ esp_err_t Thermal_set_fan_percent(DeviceConfig * DEVICE_CONFIG, float percent)
     if (DEVICE_CONFIG->family.id == BONANZA) {
         if (!isfinite(percent)) return ESP_ERR_INVALID_ARG;
         if (!BONANZA_POWER_MANAGEMENT_fan_control_allowed()) percent = 1.0f;
-        percent = fmaxf(CONFIG_BZM_1002_FAN_MIN_PERCENT / 100.0f, fminf(1.0f, percent));
+        percent = fmaxf(BONANZA_FAN_MIN_PERCENT / 100.0f, fminf(1.0f, percent));
         return BZM_bridge_set_fan_percent(percent);
     }
 

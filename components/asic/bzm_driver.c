@@ -29,13 +29,11 @@ static const char * TAG = "bzm";
 #define BZM_FAST_JOB_INTERVAL_MS 10.0
 #define BZM_STEADY_JOB_INTERVAL_MS 100.0
 
-#define BZM_CONFIGURED_RESULT_DIFFICULTY \
-    (UINT64_C(1) << (CONFIG_BZM_1002_LEAD_ZEROS - 32))
-
-_Static_assert(
-    CONFIG_BZM_1002_MIN_NONCE_DIFFICULTY ==
-        BZM_CONFIGURED_RESULT_DIFFICULTY,
-    "Bonanza local nonce difficulty must match the ASIC result filter");
+/* A 36-bit filter reports difficulty-16 results. Derive local validation
+ * and hashrate credits from the same setting programmed into the engines. */
+#define BZM_RESULT_LEAD_ZEROS 36U
+#define BZM_RESULT_DIFFICULTY (UINT64_C(1) << (BZM_RESULT_LEAD_ZEROS - 32U))
+#define BZM_DISPATCH_GAP_US 250U
 
 typedef struct {
     bzm_job_store_t job_store;
@@ -493,11 +491,11 @@ static void BZM_record_local_result(uint8_t asic_index, bool valid,
                                     double nonce_difficulty)
 {
     const uint64_t difficulty_one_units =
-        BZM_CONFIGURED_RESULT_DIFFICULTY;
+        BZM_RESULT_DIFFICULTY;
     const bool proof =
         asic_index < BZM_MAX_ASIC_COUNT && valid &&
         bzm_running_result_meets_proof(nonce_difficulty,
-            (double)CONFIG_BZM_1002_MIN_NONCE_DIFFICULTY);
+            (double)BZM_RESULT_DIFFICULTY);
     if (proof) {
         /* One result passing the programmed leading-zero filter represents
          * 2^(lead_zeros - 32) difficulty-one hash counters. This feeds the
@@ -545,7 +543,7 @@ float BZM_read_temperature(GlobalState * state)
     if (available &&
         bzm_telemetry_max_temperature(
             &snapshot, (uint64_t)now,
-            (uint64_t)CONFIG_BZM_1002_TELEMETRY_MAX_AGE_MS * 1000U,
+            BZM_TELEMETRY_MAX_AGE_US,
             &hottest_c)) {
         LAST_TEMPERATURE = hottest_c;
     }
@@ -1175,9 +1173,7 @@ static bool staged_mining_dispatch_checkpoint(void * context)
      * Give that receive path a bounded idle interval, then drain the ESP RX
      * ring before programming the next logical engine. Parser integrity is
      * still enforced without tolerance by the runtime baseline. */
-#if CONFIG_BZM_1002_DISPATCH_GAP_US > 0
-    esp_rom_delay_us(CONFIG_BZM_1002_DISPATCH_GAP_US);
-#endif
+    esp_rom_delay_us(BZM_DISPATCH_GAP_US);
     (void) bzm_serial_poll(transport, 1);
     return bzm_dispatch_gate_is_authorized(&STAGED_DISPATCH_GATE);
 }
@@ -1513,7 +1509,7 @@ bzm_bringup_outcome_t BZM_staged_running(GlobalState * state, const bzm_bringup_
             /* Match the BIRDS production work budget after the verified
              * bring-up path rebuilds the reactor for mining. */
             .timestamp_count = 60,
-            .lead_zeros = CONFIG_BZM_1002_LEAD_ZEROS,
+            .lead_zeros = BZM_RESULT_LEAD_ZEROS,
             .nonce_offset = BZM_NONCE_GAP_1002,
             .enhanced_mode = true,
         };
@@ -1599,7 +1595,7 @@ task_result *BZM_process_work(GlobalState *state)
         !bzm_job_store_contains(&BZM_STATE->job_store, share->work_handle)) return NULL;
     double difficulty = mining_nonce_difficulty(&result.job, result.nonce,
                                                 result.rolled_version);
-    bool valid = difficulty >= CONFIG_BZM_1002_MIN_NONCE_DIFFICULTY;
+    bool valid = difficulty >= BZM_RESULT_DIFFICULTY;
     BZM_record_local_result(share->asic_index, valid, difficulty);
     return valid ? &result : NULL;
 }

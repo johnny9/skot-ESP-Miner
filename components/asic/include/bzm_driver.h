@@ -45,9 +45,8 @@ bool BZM_staged_get_running_parser_baseline(bzm_serial_parser_stats_t * stats);
 
 /*
  * Production staged entry points. These keep mining dispatch closed until
- * RUNNING is proven. BALANCED_RAMP is additionally compile-gated and uses a
- * reference-style sequential pair activation with no more than one engine of
- * transient bottom/top skew.
+ * RUNNING is proven. BALANCED_RAMP uses reference-style sequential pair
+ * activation with no more than one engine of transient bottom/top skew.
  */
 bzm_bringup_outcome_t BZM_staged_initialize(GlobalState * state, bzm_bringup_report_t * report);
 bzm_bringup_outcome_t BZM_staged_chain4(bzm_bringup_report_t * report);

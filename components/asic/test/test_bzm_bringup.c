@@ -289,7 +289,7 @@ static bringup_mock_t good_mock(void)
         mock.registers[index][BZM_LOCAL_REG_SLOW_CLOCK_DIVIDER] = 2;
         mock.registers[index][BZM_LOCAL_REG_TDM_DELAY] = 1;
         mock.registers[index][BZM_LOCAL_REG_UART_TX] = 0x0f;
-        mock.registers[index][BZM_LOCAL_REG_SENSOR_TDM_GAP_COUNT] = CONFIG_BZM_1002_SENSOR_TDM_GAP_COUNT;
+        mock.registers[index][BZM_LOCAL_REG_SENSOR_TDM_GAP_COUNT] = 63;
         mock.registers[index][BZM_LOCAL_REG_SENSOR_CLOCK_DIVIDER] = 0x108;
         mock.pll_locked[index][0] = true;
         mock.pll_locked[index][1] = true;
@@ -364,7 +364,7 @@ TEST_CASE("bzm bringup reference profiles are exact", "[bzm_bringup]")
     TEST_ASSERT_EQUAL_UINT8(100, sensors.tdm_slot_count);
     TEST_ASSERT_EQUAL_UINT8(1, sensors.tdm_delay);
     TEST_ASSERT_EQUAL_UINT8(8, sensors.sensor_clock_divider);
-    TEST_ASSERT_EQUAL_UINT8(CONFIG_BZM_1002_SENSOR_TDM_GAP_COUNT, sensors.tdm_gap_count);
+    TEST_ASSERT_EQUAL_UINT8(63, sensors.tdm_gap_count);
     TEST_ASSERT_EQUAL_UINT16(2650, sensors.thermal_trip_code);
     TEST_ASSERT_EQUAL_UINT16(7561, sensors.voltage_ch0_shutdown_code);
     TEST_ASSERT_EQUAL_UINT16(800, pll.target_mhz);
@@ -502,7 +502,7 @@ TEST_CASE("bzm sensors write and read back every ASIC then require fresh telemet
         TEST_ASSERT_EQUAL_HEX32(1, mock.registers[index][BZM_LOCAL_REG_TDM_DELAY]);
         TEST_ASSERT_EQUAL_HEX32(0x0000fec9, mock.registers[index][BZM_LOCAL_REG_UART_TDM_CONTROL]);
         TEST_ASSERT_EQUAL_HEX32(0x108, mock.registers[index][BZM_LOCAL_REG_SENSOR_CLOCK_DIVIDER]);
-        TEST_ASSERT_EQUAL_HEX32(CONFIG_BZM_1002_SENSOR_TDM_GAP_COUNT, mock.registers[index][BZM_LOCAL_REG_SENSOR_TDM_GAP_COUNT]);
+        TEST_ASSERT_EQUAL_HEX32(63, mock.registers[index][BZM_LOCAL_REG_SENSOR_TDM_GAP_COUNT]);
         TEST_ASSERT_EQUAL_HEX32(0x100, mock.registers[index][BZM_LOCAL_REG_DTS_RESET_POWERDOWN]);
         TEST_ASSERT_EQUAL_HEX32(0x000a000a, mock.registers[index][BZM_LOCAL_REG_SENSOR_THRESHOLD_COUNT]);
         TEST_ASSERT_EQUAL_HEX32(0x8001U | (2650U << 1), mock.registers[index][BZM_LOCAL_REG_TEMPERATURE_TUNE_CODE]);

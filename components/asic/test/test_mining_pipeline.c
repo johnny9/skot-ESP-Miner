@@ -1,3 +1,4 @@
+#include "device_config.h"
 #include "bitmain_job_packet.h"
 #include "unity.h"
 
@@ -674,4 +675,36 @@ TEST_CASE("large coinbase job uses heap hashing and retains extranonce order",
     assert_packet_merkle("8f15704dd6a5716fe3390d9ee30f6081fa9a52e7b0c68650dbbebbad69f306a3", result.jobs[0]);
     assert_packet_merkle("81d3867d9d36bed64c0a3ecdae4792715cb93cd46f02f9dc3720d004b2850a23", result.jobs[1]);
     job_pipeline_harness_result_free(&result);
+}
+
+TEST_CASE("BZM producer uses only the negotiated finite version space", "[asic][bzm][job-task]")
+{
+    const uint32_t masks[] = {0, 0x1fffe000};
+    for (size_t m = 0; m < 2; ++m) {
+        miner_job_pool_init();
+        miner_job_t *job = miner_job_get_slot(0);
+        job->type = JOB_TYPE_SV2_STANDARD;
+        snprintf(job->job_id, sizeof(job->job_id), "42");
+        job->version = 0x20000004;
+        job->version_mask = masks[m];
+        job->ntime = 1234;
+        job->nbits = 0x1705dd01;
+        job->clean_jobs = true;
+        const job_pipeline_harness_event_t events[] = {
+            {.type = JOB_PIPELINE_HARNESS_NOTIFY, .slot = 0},
+            {.type = JOB_PIPELINE_HARNESS_TIMEOUT},
+            {.type = JOB_PIPELINE_HARNESS_TIMEOUT},
+        };
+        job_pipeline_harness_result_t result;
+        job_pipeline_harness_run((job_pipeline_harness_config_t){
+            .asic_id = BZM, .hardware_version_rolling = false,
+            .software_midstates = 4, .asic_initialized = true, .job_frequency_ms = 1,
+        }, events, 3, &result);
+        TEST_ASSERT_EQUAL_UINT32(3, result.job_count);
+        for (size_t i = 0; i < result.job_count; ++i) {
+            TEST_ASSERT_EQUAL_HEX32(0x20000004 + (m ? i * 0x8000 : 0), result.jobs[i]->version);
+            TEST_ASSERT_EQUAL_HEX32(masks[m], result.jobs[i]->version_mask);
+        }
+        job_pipeline_harness_result_free(&result);
+    }
 }

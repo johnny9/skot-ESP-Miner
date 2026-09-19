@@ -111,6 +111,7 @@ void job_pipeline_harness_run(
 
     memset(result, 0, sizeof(*result));
     harness_state = (GlobalState) {
+        .DEVICE_CONFIG.family.asic.id = config.asic_id,
         .DEVICE_CONFIG.family.asic.hardware_version_rolling =
             config.hardware_version_rolling,
         .DEVICE_CONFIG.family.asic.software_midstates =

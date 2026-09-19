@@ -1514,6 +1514,10 @@ bzm_bringup_outcome_t BZM_staged_running(GlobalState * state, const bzm_bringup_
             .enhanced_mode = true,
         };
         INITIALIZED = bzm_reactor_init(&REACTOR, &BZM_STATE->job_store, &config, &STAGED_MINING_OPS, &TRANSPORT);
+        /* A pool's clean-job notification can arrive before board startup.
+         * Prime every engine at the fast cadence after rebuilding the reactor,
+         * including on resume, so the first rotation meets the proof deadline. */
+        start_fast_dispatch_locked(INITIALIZED ? config.engine_count : 0);
         if (!INITIALIZED) {
             STAGED_BRINGUP.running_verified = false;
             staged_report(report, BZM_BRINGUP_BAD, BZM_BRINGUP_REASON_IO);

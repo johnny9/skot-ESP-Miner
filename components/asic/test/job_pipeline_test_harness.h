@@ -13,6 +13,7 @@ void spy_asic_send_work(GlobalState *state, asic_job_t *job);
 void test_asic_send_job(GlobalState *state, const asic_job_t *job);
 
 typedef struct {
+    int asic_id;
     bool hardware_version_rolling;
     uint8_t software_midstates;
     bool asic_initialized;

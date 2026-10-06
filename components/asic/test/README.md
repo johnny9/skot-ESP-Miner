@@ -43,7 +43,7 @@ logic under test is unchanged.
 | File | Production components and behavior |
 | --- | --- |
 | `test_mining_pipeline.c` | Runs SV1/SV2 job creation through common submission and the packet builders; preserves golden packet fields, version rolling, ownership, and allocation recovery. |
-| `test_bitmain_job_packets.c` | Runs the BM13xx and BM1397 drivers with the active-job store. It checks exact work packets built from common jobs, BM1397 sparse-mask wrap and disabled rolling, slot replacement, share and register responses, inactive jobs, and repeated nonces. |
+| `test_bm_job_packets.c` | Runs the BM13xx and BM1397 drivers with the active-job store. It checks exact work packets built from common jobs, BM1397 sparse-mask wrap and disabled rolling, slot replacement, share and register responses, inactive jobs, and repeated nonces. |
 | `test_version_rolling.c` | Runs the BM13xx drivers, active-job store, and SV1 and SV2 share encoders. It checks version-mask commands, driver setup, response decoding, write retries, and submitted version fields. |
 | `test_asic_result_job.c` | Runs all five drivers and checks that each nonce result carries its matched common job through slot replacement, including maximum metadata for all job protocols. It also checks out-of-range response job IDs. |
 | `test_asic_result_task.c` | Runs the ASIC result task with embedded job snapshots and mining checks, without an active-job store. It checks all job protocols, register routing, empty responses, share thresholds, self-test results, and repeated results. |
@@ -52,7 +52,7 @@ logic under test is unchanged.
 
 | File | Unit behavior |
 | --- | --- |
-| `test_bitmain_job_packet_building.c` | Golden software midstate, midstate-count limits, zeroed unused entries, and guarded unaligned packet outputs. |
+| `test_bm_job_packet_building.c` | Golden software midstate, midstate-count limits, zeroed unused entries, and guarded unaligned packet outputs. |
 | `test_asic_submit.c` | Common-job ownership, invalid metadata, and submission allocation recovery. |
 | `test_pll.c` | PLL divider selection and the calculated ASIC frequency. |
 | `test_timeout.c` | ASIC timeout calculation for different chips, chain sizes, version spaces, and the zero-chip default. |

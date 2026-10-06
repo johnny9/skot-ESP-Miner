@@ -1,19 +1,12 @@
-#include "bitmain_job_packet.h"
+#include "bm_job_packet.h"
 #include "bm_job_midstate.h"
 #include "mining.h"
+#include "mining_job_bytes.h"
 #include "utils.h"
 #include <string.h>
 
 _Static_assert(sizeof(bm13xx_job_packet_t) == 82, "BM13xx wire payload size");
 _Static_assert(sizeof(bm1397_job_packet_t) == 146, "BM1397 wire payload size");
-
-static void write_le32(uint8_t dest[4], uint32_t value)
-{
-    dest[0] = (uint8_t)value;
-    dest[1] = (uint8_t)(value >> 8);
-    dest[2] = (uint8_t)(value >> 16);
-    dest[3] = (uint8_t)(value >> 24);
-}
 
 void bm13xx_build_job_packet(const asic_job_t *job, uint8_t job_id,
                              bm13xx_job_packet_t *packet)

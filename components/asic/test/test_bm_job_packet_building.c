@@ -1,5 +1,5 @@
 #include "unity.h"
-#include "bitmain_job_packet.h"
+#include "bm_job_packet.h"
 #include "utils.h"
 #include <stddef.h>
 #include <stdlib.h>

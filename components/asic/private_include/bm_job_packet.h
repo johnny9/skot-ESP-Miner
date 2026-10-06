@@ -1,5 +1,5 @@
-#ifndef BITMAIN_JOB_PACKET_H_
-#define BITMAIN_JOB_PACKET_H_
+#ifndef BM_JOB_PACKET_H_
+#define BM_JOB_PACKET_H_
 
 #include "asic_job.h"
 

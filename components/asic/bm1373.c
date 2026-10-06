@@ -1,4 +1,4 @@
-#include "bitmain_job_packet.h"
+#include "bm_job_packet.h"
 #include "bm1373.h"
 
 #include "crc.h"

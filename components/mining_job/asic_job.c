@@ -1,12 +1,6 @@
 #include "asic_job.h"
+#include "mining_job_bytes.h"
 #include <string.h>
-
-static void write_le32(uint8_t *out, uint32_t value)
-{
-    for (unsigned i = 0; i < 4; ++i) {
-        out[i] = (uint8_t)(value >> (8 * i));
-    }
-}
 
 void asic_job_header(const asic_job_t *job, uint32_t nonce,
                      uint32_t version, uint8_t header[80])

@@ -1,4 +1,4 @@
-#include "bitmain_job_packet.h"
+#include "bm_job_packet.h"
 #include "unity.h"
 
 #include "job_pipeline_test_harness.h"

@@ -1,3 +1,4 @@
+#include "miner_asic.h"
 #include "asic_init.h"
 #include "global_state.h"
 #include "esp_log.h"
@@ -73,7 +74,7 @@ uint8_t asic_initialize(GlobalState *GLOBAL_STATE, asic_init_mode_t mode, uint32
 
         ESP_LOGI(TAG, "Detecting ASIC chips... attempt %u/%u", attempt, max_attempts);
         clear_asic_chain_error();
-        chip_count = ASIC_init(GLOBAL_STATE);
+        chip_count = miner_asic_init(GLOBAL_STATE);
 
         if (chip_count > 0) {
             break;
@@ -87,7 +88,7 @@ uint8_t asic_initialize(GlobalState *GLOBAL_STATE, asic_init_mode_t mode, uint32
         return 0;
     }
 
-    int max_baud = ASIC_set_max_baud(GLOBAL_STATE);
+    int max_baud = ASIC_set_max_baud(&GLOBAL_STATE->asic);
     if (max_baud == 0 || SERIAL_set_baud(max_baud) != ESP_OK) {
         GLOBAL_STATE->SYSTEM_MODULE.asic_status = "ASIC UART configuration failed";
         ESP_LOGE(TAG, "Failed to configure ASIC UART");

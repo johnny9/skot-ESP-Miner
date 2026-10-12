@@ -1,3 +1,4 @@
+#include "miner_asic.h"
 #include <inttypes.h>
 #include <math.h>
 #include <stdint.h>
@@ -270,17 +271,9 @@ void SYSTEM_init_system(GlobalState * GLOBAL_STATE)
     suffixString(module->best_session_nonce_diff, module->best_session_diff_string, DIFF_STRING_SIZE, 0);
 
     // Initialize mutexes
-    pthread_mutex_init(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock, NULL);
     pthread_mutex_init(&GLOBAL_STATE->transport_mutex, NULL);
-
-    // Allocate the job tracking tables here rather than in create_jobs_task().
-    // The stratum tasks touch valid_jobs (via SYSTEM_reset_pool_session) as soon as they
-    // connect, so tying the allocation to create_jobs_task actually starting is a
-    // NULL dereference waiting to happen if that task ever fails to spawn.
-    GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs = heap_caps_calloc(MAX_ASIC_JOBS, sizeof(*GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs), MALLOC_CAP_SPIRAM);
-    GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs = heap_caps_calloc(MAX_ASIC_JOBS, sizeof(uint8_t), MALLOC_CAP_SPIRAM);
-    if (GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs == NULL || GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate job tracking tables");
+    if (!miner_asic_context_init(GLOBAL_STATE)) {
+        ESP_LOGE(TAG, "Failed to initialize ASIC context");
         abort();
     }
 }
@@ -414,11 +407,11 @@ static void clean_jobs_queue(GlobalState * GLOBAL_STATE)
 {
     ESP_LOGI(TAG, "Clean Jobs: invalidating active jobs");
 
-    pthread_mutex_lock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
+    pthread_mutex_lock(&GLOBAL_STATE->asic.valid_jobs_lock);
     for (int i = 0; i < MAX_ASIC_JOBS; i = i + 4) {
-        GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs[i] = 0;
+        GLOBAL_STATE->asic.valid_jobs[i] = 0;
     }
-    pthread_mutex_unlock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
+    pthread_mutex_unlock(&GLOBAL_STATE->asic.valid_jobs_lock);
 
     // Reset hashrate measurements to prevent a spike on reconnection
     hashrate_monitor_reset_measurements(GLOBAL_STATE);

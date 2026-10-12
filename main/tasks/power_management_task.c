@@ -1,3 +1,4 @@
+#include "miner_asic.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -38,8 +39,8 @@ static void mining_stop(GlobalState * GLOBAL_STATE)
     GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value = 50;
     GLOBAL_STATE->POWER_MANAGEMENT_MODULE.expected_hashrate = 0;
 
-    ASIC_set_frequency(GLOBAL_STATE);
-    ASIC_set_nonce_space(GLOBAL_STATE);
+    miner_asic_set_frequency(GLOBAL_STATE);
+    ASIC_set_nonce_space(&GLOBAL_STATE->asic);
 
     // Cut ASIC power and hold in reset
     VCORE_set_voltage(GLOBAL_STATE, 0.0f);
@@ -253,8 +254,8 @@ void POWER_MANAGEMENT_task(void * pvParameters)
             power_management->frequency_value = asic_frequency;
             power_management->expected_hashrate = expected_hashrate(GLOBAL_STATE);
 
-            ASIC_set_frequency(GLOBAL_STATE);
-            ASIC_set_nonce_space(GLOBAL_STATE);
+            miner_asic_set_frequency(GLOBAL_STATE);
+            ASIC_set_nonce_space(&GLOBAL_STATE->asic);
             
             last_asic_frequency = asic_frequency;
         }

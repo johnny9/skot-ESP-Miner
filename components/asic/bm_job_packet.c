@@ -1,8 +1,6 @@
 #include "bm_job_packet.h"
 #include "bm_job_midstate.h"
-#include "mining.h"
 #include "mining_job_bytes.h"
-#include "utils.h"
 #include <string.h>
 
 _Static_assert(sizeof(bm13xx_job_packet_t) == 82, "BM13xx wire payload size");

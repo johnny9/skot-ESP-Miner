@@ -19,14 +19,8 @@ extern const TPS546_CONFIG TPS546_CONFIG_GAMMA_TURBO;
 extern const TPS546_CONFIG TPS546_CONFIG_NAJA_DUO;
 extern const TPS546_CONFIG TPS546_CONFIG_GAMMA_HEX;
 
-typedef enum
-{
-    BM1397,
-    BM1366,
-    BM1368,
-    BM1370,
-    BM1373,
-} Asic;
+#include "asic_config.h"
+typedef asic_model_t Asic;
 
 typedef struct AsicConfig {
     Asic id;

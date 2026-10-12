@@ -1,6 +1,6 @@
 #include "bm13xx_test_harness.h"
 #include "bm1397_test_harness.h"
-#include "global_state.h"
+#include "asic_context.h"
 #include "mining.h"
 #include "utils.h"
 #include "unity.h"
@@ -44,16 +44,16 @@ static void queue_response(bool bm1397, uint8_t wire_job_id, uint32_t nonce)
     }
 }
 
-static void replace_slot(GlobalState *state, asic_job_t *replacement)
+static void replace_slot(asic_context_t *state, asic_job_t *replacement)
 {
     // Also proves the decoder released its lock before handing back the result.
-    TEST_ASSERT_EQUAL_INT(0, pthread_mutex_trylock(&state->ASIC_TASK_MODULE.valid_jobs_lock));
-    asic_job_t *old = state->ASIC_TASK_MODULE.active_jobs[0x10];
+    TEST_ASSERT_EQUAL_INT(0, pthread_mutex_trylock(&state->valid_jobs_lock));
+    asic_job_t *old = state->active_jobs[0x10];
     memset(old, 0xa5, sizeof(*old));
     free(old);
-    state->ASIC_TASK_MODULE.active_jobs[0x10] = replacement;
-    state->ASIC_TASK_MODULE.valid_jobs[0x10] = replacement != NULL;
-    TEST_ASSERT_EQUAL_INT(0, pthread_mutex_unlock(&state->ASIC_TASK_MODULE.valid_jobs_lock));
+    state->active_jobs[0x10] = replacement;
+    state->valid_jobs[0x10] = replacement != NULL;
+    TEST_ASSERT_EQUAL_INT(0, pthread_mutex_unlock(&state->valid_jobs_lock));
 }
 
 static void assert_result_job(const asic_job_t *expected, const task_result *result,
@@ -84,9 +84,9 @@ TEST_CASE("ASIC results preserve complete matched jobs across slot reuse for eve
 {
     for (size_t d = 0; d <= BM13XX_HARNESS_DRIVER_COUNT; ++d) {
         bool bm1397 = d == BM13XX_HARNESS_DRIVER_COUNT;
-        GlobalState *state = bm1397 ? bm1397_harness_begin() : bm13xx_harness_begin();
-        uint8_t (*init)(GlobalState *) = bm1397 ? bm1397_harness_driver.init : bm13xx_harness_drivers[d].init;
-        task_result *(*process_work)(GlobalState *) = bm1397 ? bm1397_harness_driver.process_work : bm13xx_harness_drivers[d].process_work;
+        asic_context_t *state = bm1397 ? bm1397_harness_begin() : bm13xx_harness_begin();
+        uint8_t (*init)(asic_context_t *) = bm1397 ? bm1397_harness_driver.init : bm13xx_harness_drivers[d].init;
+        task_result *(*process_work)(asic_context_t *) = bm1397 ? bm1397_harness_driver.process_work : bm13xx_harness_drivers[d].process_work;
         uint8_t wire_job_id = bm1397 ? 0x13 : bm13xx_harness_drivers[d].response_job_id;
         TEST_ASSERT_EQUAL_UINT8(2, init(state));
 
@@ -137,9 +137,9 @@ TEST_CASE("BM1366 and BM1397 reject response job IDs outside the active slots",
 {
     const uint8_t invalid_ids[] = {0x83, 0xff};
     for (unsigned bm1397 = 0; bm1397 < 2; ++bm1397) {
-        GlobalState *state = bm1397 ? bm1397_harness_begin() : bm13xx_harness_begin();
-        uint8_t (*init)(GlobalState *) = bm1397 ? bm1397_harness_driver.init : bm13xx_harness_drivers[0].init;
-        task_result *(*process_work)(GlobalState *) = bm1397 ? bm1397_harness_driver.process_work : bm13xx_harness_drivers[0].process_work;
+        asic_context_t *state = bm1397 ? bm1397_harness_begin() : bm13xx_harness_begin();
+        uint8_t (*init)(asic_context_t *) = bm1397 ? bm1397_harness_driver.init : bm13xx_harness_drivers[0].init;
+        task_result *(*process_work)(asic_context_t *) = bm1397 ? bm1397_harness_driver.process_work : bm13xx_harness_drivers[0].process_work;
         TEST_ASSERT_EQUAL_UINT8(2, init(state));
         for (size_t i = 0; i < sizeof(invalid_ids); ++i) {
             queue_response(bm1397, invalid_ids[i], 0x62000000 + i);

@@ -2,13 +2,11 @@
 #define BM1397_TEST_BINDINGS_H
 
 #include <stdint.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 
-#ifdef vTaskDelay
-#undef vTaskDelay
+#ifdef asic_delay_ms
+#undef asic_delay_ms
 #endif
-#define vTaskDelay bm1397_stub_delay
+#define asic_delay_ms bm1397_stub_delay
 #define SERIAL_send bm1397_spy_serial_send
 #define SERIAL_set_baud bm1397_stub_serial_set_baud
 #define SERIAL_clear_buffer bm1397_stub_serial_clear_buffer
@@ -16,7 +14,7 @@
 #define count_asic_chips bm1397_stub_count_chips
 #define do_frequency_transition bm1397_stub_frequency_transition
 
-void bm1397_stub_delay(TickType_t ticks);
+void bm1397_stub_delay(uint32_t ms);
 
 #define BM1397_init bm1397_test_init
 #define BM1397_send_work bm1397_test_send_work

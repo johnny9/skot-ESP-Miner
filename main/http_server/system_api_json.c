@@ -1,3 +1,4 @@
+#include "miner_asic.h"
 #include <stdio.h>
 #include <string.h>
 #include "esp_partition.h"
@@ -263,7 +264,7 @@ static void system_api_add_hashrate_monitor(cJSON *root, GlobalState *g) {
         cJSON_AddItemToObject(asic, "domains", domains);
         for (int j = 0; j < hash_domains; j++) {
             asic_domain_measurement_t measurement = {0};
-            ASIC_get_domain_measurement(g, i, j, &measurement);
+            miner_asic_get_domain_measurement(g, i, j, &measurement);
             cJSON_AddItemToArray(domains, cJSON_CreateNumber(measurement.hashrate));
         }
     }

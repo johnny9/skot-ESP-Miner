@@ -20,6 +20,5 @@ void calculate_merkle_root_hash(const uint8_t coinbase_tx_hash[32], const uint8_
 
 bool mining_nonce_hash(const asic_job_t *job, const uint32_t nonce, const uint32_t rolled_version, uint8_t hash[32]);
 
-uint32_t increment_bitmask(const uint32_t value, const uint32_t mask);
 
 #endif /* MINING_H_ */

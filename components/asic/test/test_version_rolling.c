@@ -31,9 +31,9 @@ static esp_transport_handle_t create_sv1_capture(sv1_capture_t *capture)
 {
     esp_transport_handle_t transport = esp_transport_init();
     if (transport == NULL ||
-        esp_transport_set_context_data(transport, capture) != ESP_OK ||
+        esp_transport_set_context_data(transport, capture) != ASIC_OK ||
         esp_transport_set_func(transport, NULL, NULL, capture_sv1_write,
-                               NULL, NULL, NULL, NULL) != ESP_OK) {
+                               NULL, NULL, NULL, NULL) != ASIC_OK) {
         esp_transport_destroy(transport);
         return NULL;
     }
@@ -99,7 +99,7 @@ TEST_CASE("BM13xx initialization enables the full version rolling mask",
 {
     for (size_t d = 0; d < BM13XX_HARNESS_DRIVER_COUNT; d++) {
         const bm13xx_harness_driver_t *driver = &bm13xx_harness_drivers[d];
-        GlobalState *state = bm13xx_harness_begin();
+        asic_context_t *state = bm13xx_harness_begin();
         TEST_ASSERT_EQUAL_UINT8_MESSAGE(2, driver->init(state), driver->name);
         unsigned mask_count = 0;
         for (size_t p = 0; p < bm13xx_harness_packet_count(); p++) {
@@ -135,7 +135,7 @@ TEST_CASE("BM13xx response version bits reconstruct rolled block versions",
 
     for (size_t d = 0; d < BM13XX_HARNESS_DRIVER_COUNT; d++) {
         const bm13xx_harness_driver_t *driver = &bm13xx_harness_drivers[d];
-        GlobalState *state = bm13xx_harness_begin();
+        asic_context_t *state = bm13xx_harness_begin();
         TEST_ASSERT_EQUAL_UINT8(2, driver->init(state));
         for (size_t c = 0; c < sizeof(cases) / sizeof(cases[0]); c++) {
             bm13xx_harness_set_job(cases[c].base_version, true, true);
@@ -162,7 +162,7 @@ TEST_CASE("BM13xx missing jobs and register replies do not produce rolled shares
 {
     for (size_t d = 0; d < BM13XX_HARNESS_DRIVER_COUNT; d++) {
         const bm13xx_harness_driver_t *driver = &bm13xx_harness_drivers[d];
-        GlobalState *state = bm13xx_harness_begin();
+        asic_context_t *state = bm13xx_harness_begin();
         TEST_ASSERT_EQUAL_UINT8(2, driver->init(state));
         TEST_ASSERT_NULL(driver->process_work(state));
         for (unsigned flags = 0; flags < 3; flags++) {
@@ -221,7 +221,7 @@ TEST_CASE("BM13xx rolled version reaches SV1 and SV2 share messages byte exact",
     TEST_ASSERT_TRUE(STRATUM_V1_initialize_buffer());
     for (size_t d = 0; d < BM13XX_HARNESS_DRIVER_COUNT; d++) {
         const bm13xx_harness_driver_t *driver = &bm13xx_harness_drivers[d];
-        GlobalState *state = bm13xx_harness_begin();
+        asic_context_t *state = bm13xx_harness_begin();
         TEST_ASSERT_EQUAL_UINT8(2, driver->init(state));
         const uint32_t base_version = 0x20000004;
         bm13xx_harness_set_job(base_version, true, true);

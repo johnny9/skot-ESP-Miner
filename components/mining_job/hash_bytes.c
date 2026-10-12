@@ -1,4 +1,4 @@
-#include "utils.h"
+#include "asic_job.h"
 #include <string.h>
 
 static inline void reverse_32bit_words_impl(const uint8_t src[32], uint8_t dest[32])

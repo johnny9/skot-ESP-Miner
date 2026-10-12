@@ -1,6 +1,6 @@
 #include "bm_job_packet.h"
 #include "utils.h"
-#include "global_state.h"
+#include "asic_context.h"
 #include "unity.h"
 
 #include "bm13xx_test_harness.h"
@@ -82,7 +82,7 @@ TEST_CASE("BM13xx work packets preserve complete header fields byte exact",
 
     for (size_t index = 0; index < BM13XX_HARNESS_DRIVER_COUNT; ++index) {
         const bm13xx_harness_driver_t *driver = &bm13xx_harness_drivers[index];
-        GlobalState *state = bm13xx_harness_begin();
+        asic_context_t *state = bm13xx_harness_begin();
 
         asic_job_t *job = make_job();
         driver->send_work(state, job);
@@ -135,7 +135,7 @@ TEST_CASE("BM1397 work packet and returned midstate preserve version mapping",
         0x20000004, 0x20002004, 0x20004004, 0x20006004,
     };
 
-    GlobalState *state = bm1397_harness_begin();
+    asic_context_t *state = bm1397_harness_begin();
     TEST_ASSERT_EQUAL_UINT8(2, bm1397_harness_driver.init(state));
     bm1397_harness_clear_packets();
 
@@ -169,7 +169,7 @@ TEST_CASE("Bitmain occupied work slots transfer ownership to replacements",
 
     for (size_t index = 0; index < BM13XX_HARNESS_DRIVER_COUNT; ++index) {
         const bm13xx_harness_driver_t *driver = &bm13xx_harness_drivers[index];
-        GlobalState *state = bm13xx_harness_begin();
+        asic_context_t *state = bm13xx_harness_begin();
 
         asic_job_t *first = make_job();
         driver->send_work(state, first);
@@ -188,7 +188,7 @@ TEST_CASE("Bitmain occupied work slots transfer ownership to replacements",
         bm13xx_harness_end();
     }
 
-    GlobalState *state = bm1397_harness_begin();
+    asic_context_t *state = bm1397_harness_begin();
     TEST_ASSERT_EQUAL_UINT8(2, bm1397_harness_driver.init(state));
     bm1397_harness_clear_packets();
 
@@ -210,7 +210,7 @@ TEST_CASE("Bitmain occupied work slots transfer ownership to replacements",
 TEST_CASE("BM1397 register results preserve type address value and reset job fields",
           "[asic][result][register][characterization]")
 {
-    GlobalState *state = bm1397_harness_begin();
+    asic_context_t *state = bm1397_harness_begin();
     TEST_ASSERT_EQUAL_UINT8(2, bm1397_harness_driver.init(state));
 
     const uint8_t register_response[BM1397_HARNESS_RESPONSE_SIZE] = {
@@ -240,7 +240,7 @@ TEST_CASE("BM1397 register results preserve type address value and reset job fie
 TEST_CASE("BM1397 rejects inactive job results and repeated nonces",
           "[asic][result][job-store][characterization]")
 {
-    GlobalState *state = bm1397_harness_begin();
+    asic_context_t *state = bm1397_harness_begin();
     TEST_ASSERT_EQUAL_UINT8(2, bm1397_harness_driver.init(state));
     bm1397_harness_clear_packets();
 
@@ -280,7 +280,7 @@ TEST_CASE("BM1397 sparse mask wrap keeps packet midstates and returned versions 
     const uint32_t expected_versions[] = {
         0x3000a004, 0x20000004, 0x20002004, 0x20008004,
     };
-    GlobalState *state = bm1397_harness_begin();
+    asic_context_t *state = bm1397_harness_begin();
     TEST_ASSERT_EQUAL_UINT8(2, bm1397_harness_driver.init(state));
     bm1397_harness_clear_packets();
     asic_job_t *job = make_job();
@@ -306,7 +306,7 @@ TEST_CASE("BM1397 sparse mask wrap keeps packet midstates and returned versions 
 TEST_CASE("BM1397 disabled rolling sends one midstate and returns the base version",
           "[asic][job-packet][version-rolling]")
 {
-    GlobalState *state = bm1397_harness_begin();
+    asic_context_t *state = bm1397_harness_begin();
     TEST_ASSERT_EQUAL_UINT8(2, bm1397_harness_driver.init(state));
     bm1397_harness_clear_packets();
     asic_job_t *job = make_job();

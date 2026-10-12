@@ -46,7 +46,7 @@ static void spy_task_delay(TickType_t ticks)
     harness_result->delay_count++;
 }
 
-void spy_asic_send_work(GlobalState *state, asic_job_t *job)
+void spy_asic_send_work(asic_context_t *state, asic_job_t *job)
 {
     (void)state;
     if (harness_result->job_count >= JOB_PIPELINE_HARNESS_MAX_JOBS) {
@@ -55,7 +55,7 @@ void spy_asic_send_work(GlobalState *state, asic_job_t *job)
     harness_result->jobs[harness_result->job_count++] = job;
 }
 
-static void spy_asic_set_version_mask(GlobalState *state, uint32_t mask)
+static void spy_asic_set_version_mask(asic_context_t *state, uint32_t mask)
 {
     (void)state;
     if (harness_result->version_mask_count >= JOB_PIPELINE_HARNESS_MAX_JOBS) {
@@ -64,7 +64,7 @@ static void spy_asic_set_version_mask(GlobalState *state, uint32_t mask)
     harness_result->version_masks[harness_result->version_mask_count++] = mask;
 }
 
-static double stub_asic_get_job_frequency(GlobalState *state)
+static double stub_asic_get_job_frequency(asic_context_t *state)
 {
     (void)state;
     return harness_job_frequency_ms;
@@ -157,6 +157,6 @@ void job_pipeline_harness_send_job(const asic_job_t *job, job_pipeline_harness_r
     memset(result, 0, sizeof(*result));
     harness_state = (GlobalState) {0};
     harness_result = result;
-    test_asic_send_job(&harness_state, job);
+    test_asic_send_job(&harness_state.asic, job);
     harness_result = NULL;
 }

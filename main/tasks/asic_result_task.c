@@ -25,7 +25,7 @@ void ASIC_result_task(void *pvParameters)
             continue;
         }
 
-        task_result *asic_result = ASIC_process_work(GLOBAL_STATE);
+        task_result *asic_result = ASIC_process_work(&GLOBAL_STATE->asic);
 
         if (asic_result == NULL)
         {

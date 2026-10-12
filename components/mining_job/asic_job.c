@@ -12,3 +12,8 @@ void asic_job_header(const asic_job_t *job, uint32_t nonce,
     write_le32(header + 72, job->nbits);
     write_le32(header + 76, nonce);
 }
+
+uint32_t increment_bitmask(uint32_t value, uint32_t mask)
+{
+    return (value & ~mask) | (((value | ~mask) + 1U) & mask);
+}

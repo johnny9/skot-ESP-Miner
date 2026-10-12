@@ -63,9 +63,9 @@ bool result_task_fake_mining_nonce_hash(const asic_job_t *job, uint32_t nonce,
     return double_sha256_bin(header, sizeof(header), hash);
 }
 
-task_result *result_task_fake_process_work(GlobalState *state)
+task_result *result_task_fake_process_work(asic_context_t *state)
 {
-    TEST_ASSERT_EQUAL_PTR(&fixture_state, state);
+    TEST_ASSERT_EQUAL_PTR(&fixture_state.asic, state);
     if (fixture_event_index++ == 0) {
         return NULL;
     }

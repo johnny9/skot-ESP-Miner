@@ -1,8 +1,10 @@
 #include "asic_internal.h"
+#include "asic_context_internal.h"
+#include <math.h>
 #include <string.h>
 #include <stdlib.h>
 
-#include <esp_log.h>
+#include "asic_platform.h"
 
 #include "bm1397.h"
 #include "bm1366.h"
@@ -11,53 +13,62 @@
 #include "bm1373.h"
 
 #include "asic.h"
-#include "global_state.h"
-#include "mining.h"
-#include "device_config.h"
+#include "asic_context.h"
 #include "frequency_transition_bmXX.h"
 
 static const char *TAG = "asic";
 
-uint8_t ASIC_init(GlobalState * GLOBAL_STATE)
+static uint8_t initialize_driver(asic_context_t * state)
 {
-    ESP_LOGI(TAG, "Initializing %dx %s", GLOBAL_STATE->DEVICE_CONFIG.family.asic_count, GLOBAL_STATE->DEVICE_CONFIG.family.asic.name);
-    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+    ASIC_LOGI(TAG, "Initializing %dx ASIC model %d", state->config.asic_count, state->config.model);
+    switch (state->config.model) {
         case BM1397:
-            return BM1397_init(GLOBAL_STATE);
+            return BM1397_init(state);
         case BM1366:
-            return BM1366_init(GLOBAL_STATE);
+            return BM1366_init(state);
         case BM1368:
-            return BM1368_init(GLOBAL_STATE);
+            return BM1368_init(state);
         case BM1370:
-            return BM1370_init(GLOBAL_STATE);
+            return BM1370_init(state);
         case BM1373:
-            return BM1373_init(GLOBAL_STATE);
+            return BM1373_init(state);
     }
-    ESP_LOGE(TAG, "Unknown ASIC id %d", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
+    ASIC_LOGE(TAG, "Unknown ASIC id %d", state->config.model);
     return 0;
 }
 
-task_result * ASIC_process_work(GlobalState * GLOBAL_STATE)
+uint8_t ASIC_init(asic_context_t *state)
 {
-    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+    if (!asic_context_claim(state)) return 0;
+    state->hardware_initialized = false;
+    uint8_t count = initialize_driver(state);
+    state->hardware_initialized = count != 0;
+    return count;
+}
+
+task_result * ASIC_process_work(asic_context_t * state)
+{
+    if (!asic_context_is_active(state) || !state->hardware_initialized) { return NULL; }
+    switch (state->config.model) {
         case BM1397:
-            return BM1397_process_work(GLOBAL_STATE);
+            return BM1397_process_work(state);
         case BM1366:
-            return BM1366_process_work(GLOBAL_STATE);
+            return BM1366_process_work(state);
         case BM1368:
-            return BM1368_process_work(GLOBAL_STATE);
+            return BM1368_process_work(state);
         case BM1370:
-            return BM1370_process_work(GLOBAL_STATE);
+            return BM1370_process_work(state);
         case BM1373:
-            return BM1373_process_work(GLOBAL_STATE);
+            return BM1373_process_work(state);
     }
-    ESP_LOGE(TAG, "Unknown ASIC id %d — cannot process work", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
+    ASIC_LOGE(TAG, "Unknown ASIC id %d — cannot process work", state->config.model);
     return NULL;
 }
 
-int ASIC_set_max_baud(GlobalState * GLOBAL_STATE)
+int ASIC_set_max_baud(asic_context_t * state)
 {
-    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+    if (!asic_context_is_active(state) || !state->hardware_initialized) { return 0; }
+    switch (state->config.model) {
         case BM1397:
             return BM1397_set_max_baud();
         case BM1366:
@@ -69,38 +80,40 @@ int ASIC_set_max_baud(GlobalState * GLOBAL_STATE)
         case BM1373:
             return BM1373_set_max_baud();
     }
-    ESP_LOGE(TAG, "Unknown ASIC id %d — cannot set max baud", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
+    ASIC_LOGE(TAG, "Unknown ASIC id %d — cannot set max baud", state->config.model);
     return 0;
 }
 
-void ASIC_send_work(GlobalState * GLOBAL_STATE, asic_job_t * next_job)
+void ASIC_send_work(asic_context_t * state, asic_job_t * next_job)
 {
-    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+    if (!asic_context_is_active(state) || !state->hardware_initialized) { free(next_job); return; }
+    switch (state->config.model) {
         case BM1397:
-            BM1397_send_work(GLOBAL_STATE, next_job);
+            BM1397_send_work(state, next_job);
             break;
         case BM1366:
-            BM1366_send_work(GLOBAL_STATE, next_job);
+            BM1366_send_work(state, next_job);
             break;
         case BM1368:
-            BM1368_send_work(GLOBAL_STATE, next_job);
+            BM1368_send_work(state, next_job);
             break;
         case BM1370:
-            BM1370_send_work(GLOBAL_STATE, next_job);
+            BM1370_send_work(state, next_job);
             break;
         case BM1373:
-            BM1373_send_work(GLOBAL_STATE, next_job);
+            BM1373_send_work(state, next_job);
             break;
         default:
-            ESP_LOGE(TAG, "Unknown ASIC id %d — cannot send work", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
+            ASIC_LOGE(TAG, "Unknown ASIC id %d — cannot send work", state->config.model);
             free(next_job);
             break;
     }
 }
 
-void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask)
+void ASIC_set_version_mask(asic_context_t * state, uint32_t mask)
 {
-    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+    if (!asic_context_is_active(state) || !state->hardware_initialized) { return; }
+    switch (state->config.model) {
         case BM1397:
             BM1397_set_version_mask(mask);
             break;
@@ -117,41 +130,52 @@ void ASIC_set_version_mask(GlobalState * GLOBAL_STATE, uint32_t mask)
             BM1373_set_version_mask(mask);
             break;
         default:
-            ESP_LOGE(TAG, "Unknown ASIC id %d — cannot set version mask", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
+            ASIC_LOGE(TAG, "Unknown ASIC id %d — cannot set version mask", state->config.model);
             break;
     }
 }
 
-void ASIC_set_frequency(GlobalState * GLOBAL_STATE)
+static void set_frequency(asic_context_t * state)
 {
-    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+    if (!asic_context_is_active(state) || !state->hardware_initialized) { return; }
+    switch (state->config.model) {
         case BM1397:
-            do_frequency_transition(GLOBAL_STATE, BM1397_send_hash_frequency);
+            do_frequency_transition(state, BM1397_send_hash_frequency);
             return;
         case BM1366:
-            do_frequency_transition(GLOBAL_STATE, BM1366_send_hash_frequency);
+            do_frequency_transition(state, BM1366_send_hash_frequency);
             return;
         case BM1368:
-            do_frequency_transition(GLOBAL_STATE, BM1368_send_hash_frequency);
+            do_frequency_transition(state, BM1368_send_hash_frequency);
             return;
         case BM1370:
-            do_frequency_transition(GLOBAL_STATE, BM1370_send_hash_frequency);
+            do_frequency_transition(state, BM1370_send_hash_frequency);
             return;
         case BM1373:
-            do_frequency_transition(GLOBAL_STATE, BM1373_send_hash_frequency);
+            do_frequency_transition(state, BM1373_send_hash_frequency);
             return;
     }
-    ESP_LOGE(TAG, "Unknown ASIC id %d — cannot set frequency", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
+    ASIC_LOGE(TAG, "Unknown ASIC id %d — cannot set frequency", state->config.model);
 }
 
-void ASIC_set_nonce_space(GlobalState * GLOBAL_STATE)
+float ASIC_set_frequency(asic_context_t *state, float frequency_mhz)
 {
-    float nonce_percent = 1.0;
-    int cores = GLOBAL_STATE->DEVICE_CONFIG.family.asic.core_count;
-    int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
-    float frequency = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency;
+    if (!asic_context_is_active(state) || !state->hardware_initialized ||
+        !isfinite(frequency_mhz) || frequency_mhz <= 0) return 0;
+    state->requested_frequency_mhz = frequency_mhz;
+    set_frequency(state);
+    return state->actual_frequency_mhz;
+}
 
-    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+void ASIC_set_nonce_space(asic_context_t * state)
+{
+    if (!asic_context_is_active(state) || !state->hardware_initialized) { return; }
+    float nonce_percent = 1.0;
+    int cores = state->config.core_count;
+    int asic_count = state->config.asic_count;
+    float frequency = state->actual_frequency_mhz;
+
+    switch (state->config.model) {
         case BM1397:
             return;
         case BM1366:
@@ -167,77 +191,53 @@ void ASIC_set_nonce_space(GlobalState * GLOBAL_STATE)
             BM1373_set_nonce_space(nonce_percent, frequency, asic_count, cores);
             return;
     }
-    ESP_LOGE(TAG, "Unknown ASIC id %d — cannot set nonce space", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
+    ASIC_LOGE(TAG, "Unknown ASIC id %d — cannot set nonce space", state->config.model);
 }
 
-double ASIC_get_asic_job_frequency_ms(GlobalState * GLOBAL_STATE)
+double ASIC_get_asic_job_frequency_ms(asic_context_t * state)
 {
-    float freq = GLOBAL_STATE->POWER_MANAGEMENT_MODULE.frequency_value;
-    int cores = GLOBAL_STATE->DEVICE_CONFIG.family.asic.core_count;
-    int small_cores = GLOBAL_STATE->DEVICE_CONFIG.family.asic.small_core_count;
-    int asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
-    int asic_default_timeout_divided = GLOBAL_STATE->DEVICE_CONFIG.family.asic.default_asic_timeout / _next_power_of_two(asic_count);
+    if (!state || !state->initialized) return 500;
+    float freq = state->requested_frequency_mhz;
+    int cores = state->config.core_count;
+    int small_cores = state->config.small_core_count;
+    int asic_count = state->config.asic_count;
+    int asic_default_timeout_divided = state->config.default_timeout_ms / _next_power_of_two(asic_count);
 
-    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+    switch (state->config.model) {
         case BM1397:
             // no version-rolling so same Nonce Space is splitted between Big Cores
-            return calculate_bm_timeout_ms(freq, asic_count, small_cores, cores, GLOBAL_STATE->DEVICE_CONFIG.family.asic.software_midstates, 1.0, asic_default_timeout_divided);
+            return calculate_bm_timeout_ms(freq, asic_count, small_cores, cores, state->config.software_midstates, 1.0, asic_default_timeout_divided);
         case BM1366:
         case BM1368:
         case BM1370:
         case BM1373:
             return asic_default_timeout_divided;
     }
-    ESP_LOGE(TAG, "Unknown ASIC id %d — cannot compute job frequency", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
+    ASIC_LOGE(TAG, "Unknown ASIC id %d — cannot compute job frequency", state->config.model);
     return 500;
 }
 
-void ASIC_read_registers(GlobalState * GLOBAL_STATE)
+void ASIC_read_registers(asic_context_t * state)
 {
-    switch (GLOBAL_STATE->DEVICE_CONFIG.family.asic.id) {
+    if (!asic_context_is_active(state) || !state->hardware_initialized) { return; }
+    switch (state->config.model) {
         case BM1397:
-            BM1397_read_registers(GLOBAL_STATE);
+            BM1397_read_registers(state);
             break;
         case BM1366:
-            BM1366_read_registers(GLOBAL_STATE);
+            BM1366_read_registers(state);
             break;
         case BM1368:
-            BM1368_read_registers(GLOBAL_STATE);
+            BM1368_read_registers(state);
             break;
         case BM1370:
-            BM1370_read_registers(GLOBAL_STATE);
+            BM1370_read_registers(state);
             break;
         case BM1373:
             BM1373_read_registers();
             break;
         default:
-            ESP_LOGE(TAG, "Unknown ASIC id %d — cannot read registers", GLOBAL_STATE->DEVICE_CONFIG.family.asic.id);
+            ASIC_LOGE(TAG, "Unknown ASIC id %d — cannot read registers", state->config.model);
             break;
     }
-}
-
-esp_err_t ASIC_get_domain_measurement(GlobalState * GLOBAL_STATE, uint8_t asic_nr,
-                                      uint8_t domain_nr, asic_domain_measurement_t * measurement)
-{
-    if (GLOBAL_STATE == NULL || measurement == NULL) {
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    HashrateMonitorModule * monitor = &GLOBAL_STATE->HASHRATE_MONITOR_MODULE;
-    if (!monitor->is_initialized) {
-        return ESP_ERR_INVALID_STATE;
-    }
-
-    if (asic_nr >= GLOBAL_STATE->DEVICE_CONFIG.family.asic_count ||
-        domain_nr >= GLOBAL_STATE->DEVICE_CONFIG.family.asic.hash_domains) {
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    pthread_mutex_lock(&monitor->lock);
-    measurement_t register_measurement = monitor->domain_measurements[asic_nr][domain_nr];
-    pthread_mutex_unlock(&monitor->lock);
-
-    measurement->time_us = register_measurement.time_us;
-    measurement->hashrate = register_measurement.hashrate;
-    return ESP_OK;
 }

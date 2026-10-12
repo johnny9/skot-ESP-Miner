@@ -2,15 +2,13 @@
 #define BM13XX_TEST_BINDINGS_H
 
 #include <stdint.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 
 /* Test-build names keep these instances separate from the firmware drivers.
  * Only external I/O and timing are replaced; no driver logic is compiled out. */
-#ifdef vTaskDelay
-#undef vTaskDelay
+#ifdef asic_delay_ms
+#undef asic_delay_ms
 #endif
-#define vTaskDelay bm13xx_spy_delay
+#define asic_delay_ms bm13xx_spy_delay
 #define SERIAL_send bm13xx_spy_serial_send
 #define SERIAL_set_baud bm13xx_stub_serial_set_baud
 #define SERIAL_clear_buffer bm13xx_stub_serial_clear_buffer
@@ -19,7 +17,7 @@
 #define count_asic_chips_with_id_alias bm13xx_stub_count_chips_with_alias
 #define do_frequency_transition bm13xx_stub_frequency_transition
 
-void bm13xx_spy_delay(TickType_t ticks);
+void bm13xx_spy_delay(uint32_t ms);
 
 #define BM1366_init bm1366_test_init
 #define BM1366_send_work bm1366_test_send_work

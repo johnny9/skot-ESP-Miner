@@ -7,6 +7,35 @@ permissions:
   contents: read
 
 jobs:
+  asic-host:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v6
+      - name: Checkout Unity for existing ASIC regressions
+        uses: actions/checkout@v6
+        with:
+          repository: ThrowTheSwitch/Unity
+          ref: bf560290f6020737eafaa8b5cbd2177c3956c03f
+          path: .test-unity
+      - name: Build and test native ASIC drivers
+        env:
+          CC: ${{ matrix.compiler }}
+        run: |
+          cmake -S components/asic -B build/asic-host \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+            -DASIC_UNITY_SOURCE_DIR="$PWD/.test-unity/src"
+          cmake --build build/asic-host --parallel
+          ctest --test-dir build/asic-host --output-on-failure
+      - name: Build independent CMake consumer
+        run: |
+          cmake -S examples/asic_host -B build/asic-example
+          cmake --build build/asic-example --parallel
+          ./build/asic-example/asic_host
+
   build-and-test:
     runs-on: ubuntu-latest
     steps:

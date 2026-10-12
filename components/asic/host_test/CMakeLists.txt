@@ -1,0 +1,17 @@
+add_executable(asic_portable_test test_portable.c)
+target_link_libraries(asic_portable_test PRIVATE asic::asic)
+target_include_directories(asic_portable_test PRIVATE ../private_include)
+target_compile_options(asic_portable_test PRIVATE -UNDEBUG -Wall -Wextra -Werror)
+add_test(NAME asic_portable COMMAND asic_portable_test)
+
+set(ASIC_UNITY_SOURCE_DIR "" CACHE PATH "Directory containing upstream unity.c and unity.h")
+if(ASIC_UNITY_SOURCE_DIR)
+    add_library(asic_test_unity STATIC "${ASIC_UNITY_SOURCE_DIR}/unity.c")
+    target_include_directories(asic_test_unity PUBLIC "${ASIC_UNITY_SOURCE_DIR}")
+    target_compile_definitions(asic_test_unity PUBLIC UNITY_INCLUDE_DOUBLE)
+    add_executable(asic_regression_tests native_unity.c
+        ../test/test_pll.c ../test/test_timeout.c ../../mining_job/test/test_asic_job.c)
+    target_link_libraries(asic_regression_tests PRIVATE asic::asic asic_test_unity)
+    target_compile_options(asic_regression_tests PRIVATE -include "${CMAKE_CURRENT_SOURCE_DIR}/native_unity.h")
+    add_test(NAME asic_existing_regressions COMMAND asic_regression_tests)
+endif()

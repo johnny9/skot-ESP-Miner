@@ -181,7 +181,7 @@ void hashrate_monitor_task(void *pvParameters)
         was_asic_initialized = is_asic_initialized;
 
         if (is_asic_initialized) {
-            ASIC_read_registers(GLOBAL_STATE);
+            ASIC_read_registers(&GLOBAL_STATE->asic);
             vTaskDelay(100 / portTICK_PERIOD_MS);
 
             pthread_mutex_lock(&HASHRATE_MONITOR_MODULE->lock);

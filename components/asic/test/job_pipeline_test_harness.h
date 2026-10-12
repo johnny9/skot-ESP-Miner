@@ -7,10 +7,11 @@
 
 #include "mining.h"
 #include "asic_job.h"
+#include "asic_context.h"
 
 typedef struct GlobalState GlobalState;
-void spy_asic_send_work(GlobalState *state, asic_job_t *job);
-void test_asic_send_job(GlobalState *state, const asic_job_t *job);
+void spy_asic_send_work(asic_context_t *state, asic_job_t *job);
+void test_asic_send_job(asic_context_t *state, const asic_job_t *job);
 
 typedef struct {
     bool hardware_version_rolling;

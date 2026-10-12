@@ -8,7 +8,7 @@
 #include "bm1370.h"
 #include "bm1373.h"
 #include "frequency_transition_bmXX.h"
-#include "global_state.h"
+#include "asic_context.h"
 #include "mining.h"
 #include "serial.h"
 #include "unity.h"
@@ -22,7 +22,7 @@ const bm13xx_harness_driver_t
     };
 
 enum { MAX_PACKETS = 128, JOB_SLOT = 0x10, JOB_SLOTS = 128 };
-static GlobalState fixture_state;
+static asic_context_t fixture_state;
 static asic_job_t saved_job;
 static asic_job_t *active_jobs[JOB_SLOTS];
 static uint8_t valid_jobs[JOB_SLOTS];
@@ -33,22 +33,23 @@ static bool response_ready;
 static unsigned failed_writes;
 static unsigned delay_count;
 
-GlobalState *bm13xx_harness_begin(void)
+asic_context_t *bm13xx_harness_begin(void)
 {
     memset(active_jobs, 0, sizeof(active_jobs));
     memset(valid_jobs, 0, sizeof(valid_jobs));
-    fixture_state = (GlobalState) {
-        .DEVICE_CONFIG.family.asic_count = 2,
-        .DEVICE_CONFIG.family.voltage_domains = 1,
-        .DEVICE_CONFIG.family.asic.difficulty = 256,
-        .DEVICE_CONFIG.family.asic.core_count = 112,
-        .POWER_MANAGEMENT_MODULE.frequency_value = 200.0f,
-        .POWER_MANAGEMENT_MODULE.actual_frequency = 200.0f,
-        .ASIC_TASK_MODULE.active_jobs = active_jobs,
-        .ASIC_TASK_MODULE.valid_jobs = valid_jobs,
+    fixture_state = (asic_context_t) {
+        .config.asic_count = 2,
+        .config.version_mask = BIP320_VERSION_ROLLING_MASK,
+        .config.voltage_domains = 1,
+        .config.difficulty = 256,
+        .config.core_count = 112,
+        .requested_frequency_mhz = 200.0f,
+        .actual_frequency_mhz = 200.0f,
+        .active_jobs = active_jobs,
+        .valid_jobs = valid_jobs,
     };
     TEST_ASSERT_EQUAL_INT(0, pthread_mutex_init(
-        &fixture_state.ASIC_TASK_MODULE.valid_jobs_lock, NULL));
+        &fixture_state.valid_jobs_lock, NULL));
     packet_count = 0;
     response_ready = false;
     failed_writes = 0;
@@ -66,11 +67,11 @@ void bm13xx_harness_end(void)
     }
     /* Also catches a driver returning without releasing the job lock. */
     TEST_ASSERT_EQUAL_INT(0, pthread_mutex_trylock(
-        &fixture_state.ASIC_TASK_MODULE.valid_jobs_lock));
+        &fixture_state.valid_jobs_lock));
     TEST_ASSERT_EQUAL_INT(0, pthread_mutex_unlock(
-        &fixture_state.ASIC_TASK_MODULE.valid_jobs_lock));
+        &fixture_state.valid_jobs_lock));
     TEST_ASSERT_EQUAL_INT(0, pthread_mutex_destroy(
-        &fixture_state.ASIC_TASK_MODULE.valid_jobs_lock));
+        &fixture_state.valid_jobs_lock));
 }
 
 void bm13xx_harness_clear_packets(void)
@@ -145,27 +146,27 @@ int bm13xx_spy_serial_send(uint8_t *bytes, int length, bool debug)
     return length;
 }
 
-esp_err_t bm13xx_stub_serial_set_baud(int baud)
+asic_err_t bm13xx_stub_serial_set_baud(int baud)
 {
     TEST_ASSERT_EQUAL_INT(3000000, baud);
-    return ESP_OK;
+    return ASIC_OK;
 }
 
 void bm13xx_stub_serial_clear_buffer(void)
 {
 }
 
-esp_err_t bm13xx_fake_receive_work(uint8_t *buffer, int size,
+asic_err_t bm13xx_fake_receive_work(uint8_t *buffer, int size,
                                   uint64_t *timestamp_us)
 {
     TEST_ASSERT_EQUAL_INT(sizeof(queued_response), size);
     if (!response_ready) {
-        return ESP_FAIL;
+        return ASIC_FAIL;
     }
     memcpy(buffer, queued_response, sizeof(queued_response));
     response_ready = false;
     *timestamp_us = 123456789;
-    return ESP_OK;
+    return ASIC_OK;
 }
 
 int bm13xx_stub_count_chips(uint16_t count, uint16_t chip_id,
@@ -186,15 +187,15 @@ int bm13xx_stub_count_chips_with_alias(
 }
 
 void bm13xx_stub_frequency_transition(
-    GlobalState *state, set_hash_frequency_fn set_frequency)
+    asic_context_t *state, set_hash_frequency_fn set_frequency)
 {
     /* Clock ramps are outside the version-rolling contract. */
     (void)state;
     (void)set_frequency;
 }
 
-void bm13xx_spy_delay(TickType_t ticks)
+void bm13xx_spy_delay(uint32_t ms)
 {
-    (void)ticks;
+    (void)ms;
     delay_count++;
 }

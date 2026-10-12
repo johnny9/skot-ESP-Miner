@@ -40,7 +40,7 @@ static void generate_work_from_miner_job(GlobalState *GLOBAL_STATE, const miner_
         free(next_job);
         return;
     }
-    ASIC_send_job(GLOBAL_STATE, next_job);
+    ASIC_send_job(&GLOBAL_STATE->asic, next_job);
     free(next_job);
 }
 
@@ -56,7 +56,7 @@ void create_jobs_task(void *pvParameters)
     bool current_work_sent = false;
     uint64_t extranonce_2 = 0;
     uint32_t current_version = 0;
-    int timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
+    int timeout_ms = ASIC_get_asic_job_frequency_ms(&GLOBAL_STATE->asic);
 
     ESP_LOGI(TAG, "ASIC Job Interval: %d ms", timeout_ms);
     ESP_LOGI(TAG, "ASIC Ready!");
@@ -78,7 +78,7 @@ void create_jobs_task(void *pvParameters)
 
             if (new_work->version_mask != current_version_mask && GLOBAL_STATE->ASIC_initalized) {
                 ESP_LOGI(TAG, "Set chip version rolls %i", (int)(new_work->version_mask >> 13));
-                ASIC_set_version_mask(GLOBAL_STATE, new_work->version_mask);
+                ASIC_set_version_mask(&GLOBAL_STATE->asic, new_work->version_mask);
                 current_version_mask = new_work->version_mask;
             }
 
@@ -94,7 +94,7 @@ void create_jobs_task(void *pvParameters)
                 continue;
             }
             if (!miner_job_is_rollable(current_work) && current_work_sent && GLOBAL_STATE->DEVICE_CONFIG.family.asic.hardware_version_rolling) {
-                timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
+                timeout_ms = ASIC_get_asic_job_frequency_ms(&GLOBAL_STATE->asic);
                 continue;
             }
         }
@@ -115,6 +115,6 @@ void create_jobs_task(void *pvParameters)
                 current_version = increment_bitmask(current_version, mask);
             }
         }
-        timeout_ms = ASIC_get_asic_job_frequency_ms(GLOBAL_STATE);
+        timeout_ms = ASIC_get_asic_job_frequency_ms(&GLOBAL_STATE->asic);
     }
 }

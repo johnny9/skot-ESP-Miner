@@ -6,17 +6,13 @@
 #include <math.h>
 #include <arpa/inet.h>
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include "frequency_transition_bmXX.h"
-#include "esp_log.h"
+#include "asic_platform.h"
 
 #include "serial.h"
 #include "bm1397.h"
-#include "utils.h"
 #include "crc.h"
-#include "mining.h"
-#include "global_state.h"
+#include "asic_context.h"
 #include "pll.h"
 
 #define BM1397_CHIP_ID 0x1397
@@ -93,7 +89,7 @@ static void _send_BM1397(uint8_t header, uint8_t *data, uint8_t data_len, bool d
     uint8_t total_length = (packet_type == JOB_PACKET) ? (data_len + 6) : (data_len + 5);
 
     if (total_length > 160) {
-        ESP_LOGE(TAG, "Packet length %d exceeds maximum buffer size", total_length);
+        ASIC_LOGE(TAG, "Packet length %d exceeds maximum buffer size", total_length);
         return;
     }
 
@@ -168,28 +164,28 @@ float BM1397_send_hash_frequency(float target_freq)
 
     for (int i = 0; i < 2; i++)
     {
-        vTaskDelay(10 / portTICK_PERIOD_MS);
+        asic_delay_ms(10);
         _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), prefreq1, 6, BM1397_SERIALTX_DEBUG);
     }
     for (int i = 0; i < 2; i++)
     {
-        vTaskDelay(10 / portTICK_PERIOD_MS);
+        asic_delay_ms(10);
         _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), freqbuf, 6, BM1397_SERIALTX_DEBUG);
     }
 
-    vTaskDelay(10 / portTICK_PERIOD_MS);
+    asic_delay_ms(10);
 
-    ESP_LOGI(TAG, "Setting Frequency to %g MHz (%g)", target_freq, frequency);
+    ASIC_LOGI(TAG, "Setting Frequency to %g MHz (%g)", target_freq, frequency);
 
     return frequency;
 }
 
-uint8_t BM1397_init(GlobalState * GLOBAL_STATE)
+uint8_t BM1397_init(asic_context_t * state)
 {
     // send the init command
     _send_read_address();
 
-    uint16_t asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
+    uint16_t asic_count = state->config.asic_count;
     int chip_counter = count_asic_chips(asic_count, BM1397_CHIP_ID, BM1397_CHIP_ID_RESPONSE_LENGTH);
 
     if (chip_counter == 0) {
@@ -197,7 +193,7 @@ uint8_t BM1397_init(GlobalState * GLOBAL_STATE)
     }
 
     // send serial data
-    vTaskDelay(SLEEP_TIME / portTICK_PERIOD_MS);
+    asic_delay_ms(SLEEP_TIME);
     _send_chain_inactive();
 
     // split the chip address space evenly
@@ -218,7 +214,7 @@ uint8_t BM1397_init(GlobalState * GLOBAL_STATE)
     unsigned char init4[9] = {0x00, CORE_REGISTER_CONTROL, 0x80, 0x00, 0x80, 0x74}; // init4 - init_4_?
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), init4, 6, BM1397_SERIALTX_DEBUG);
 
-    uint16_t difficulty = GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty;
+    uint16_t difficulty = state->config.difficulty;
 
     //set difficulty mask
     uint8_t difficulty_mask[6];
@@ -238,7 +234,7 @@ uint8_t BM1397_init(GlobalState * GLOBAL_STATE)
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, BM1397_SERIALTX_DEBUG);
 
     //ramp up the hash frequency
-    do_frequency_transition(GLOBAL_STATE, BM1397_send_hash_frequency);
+    do_frequency_transition(state, BM1397_send_hash_frequency);
 
     return chip_counter;
 }
@@ -246,7 +242,7 @@ uint8_t BM1397_init(GlobalState * GLOBAL_STATE)
 int BM1397_set_max_baud(void)
 {
     // divider of 0 for 3,125,000
-    ESP_LOGI(TAG, "Setting max baud of 3125000");
+    ASIC_LOGI(TAG, "Setting max baud of 3125000");
     unsigned char baudrate[9] = {0x00, MISC_CONTROL, 0x00, 0x00, 0b01100000, 0b00110001};
     ; // baudrate - misc_control
     _send_BM1397((TYPE_CMD | GROUP_ALL | CMD_WRITE), baudrate, 6, BM1397_SERIALTX_DEBUG);
@@ -255,7 +251,7 @@ int BM1397_set_max_baud(void)
 
 static uint8_t id = 0;
 
-void BM1397_send_work(GlobalState * GLOBAL_STATE, asic_job_t * next_job)
+void BM1397_send_work(asic_context_t * state, asic_job_t * next_job)
 {
     bm1397_job_packet_t job;
     // max job number is 128
@@ -264,42 +260,42 @@ void BM1397_send_work(GlobalState * GLOBAL_STATE, asic_job_t * next_job)
     id = (id + 4) % 128;
 
     bm1397_build_job_packet(next_job, id,
-                            GLOBAL_STATE->DEVICE_CONFIG.family.asic.software_midstates, &job);
+                            state->config.software_midstates, &job);
 
     // Hold valid_jobs_lock across the free + reassignment so result decoding
     // (which snapshots active_jobs[job_id] under the same lock) can never observe
     // or copy a slot we are freeing/replacing here. valid_jobs is set inside the
     // same critical section so validity and the pointer stay consistent.
-    pthread_mutex_lock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
-    if (GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id] != NULL)
+    pthread_mutex_lock(&state->valid_jobs_lock);
+    if (state->active_jobs[job.job_id] != NULL)
     {
-        free(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id]);
+        free(state->active_jobs[job.job_id]);
     }
-    GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id] = next_job;
-    GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs[job.job_id] = 1;
-    pthread_mutex_unlock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
+    state->active_jobs[job.job_id] = next_job;
+    state->valid_jobs[job.job_id] = 1;
+    pthread_mutex_unlock(&state->valid_jobs_lock);
 
     #if BM1397_DEBUG_JOBS
-    ESP_LOGI(TAG, "Send Job: %02X", job.job_id);
+    ASIC_LOGI(TAG, "Send Job: %02X", job.job_id);
     #endif
 
     _send_BM1397((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *)&job, sizeof(job), BM1397_DEBUG_WORK);
 }
 
-task_result *BM1397_process_work(GlobalState * GLOBAL_STATE)
+task_result *BM1397_process_work(asic_context_t * state)
 {
     bm1397_asic_result_t asic_result = {0};
 
     memset(&result, 0, sizeof(task_result));
 
-    if (receive_work((uint8_t *)&asic_result, sizeof(asic_result), &result.timestamp_us) == ESP_FAIL) {
+    if (receive_work((uint8_t *)&asic_result, sizeof(asic_result), &result.timestamp_us) == ASIC_FAIL) {
         return NULL;
     }
 
     if (!asic_result.is_job_response) {
         result.register_type = REGISTER_MAP[asic_result.cmd.register_address];
         if (result.register_type == REGISTER_INVALID) {
-            ESP_LOGW(TAG, "Unknown register read: %02x", asic_result.cmd.register_address);
+            ASIC_LOGW(TAG, "Unknown register read: %02x", asic_result.cmd.register_address);
             return NULL;
         }
         result.asic_nr = asic_result.cmd.asic_address / address_interval;
@@ -316,15 +312,15 @@ task_result *BM1397_process_work(GlobalState * GLOBAL_STATE)
 
     // Snapshot the complete job before slot reuse, then decode the midstate
     // index using that same snapshot's version and mask.
-    pthread_mutex_lock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
-    if (rx_job_id >= MAX_ASIC_JOBS || GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs[rx_job_id] == 0 || GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[rx_job_id] == NULL)
+    pthread_mutex_lock(&state->valid_jobs_lock);
+    if (rx_job_id >= MAX_ASIC_JOBS || state->valid_jobs[rx_job_id] == 0 || state->active_jobs[rx_job_id] == NULL)
     {
-        pthread_mutex_unlock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
-        ESP_LOGW(TAG, "Invalid job nonce found, id=%d", rx_job_id);
+        pthread_mutex_unlock(&state->valid_jobs_lock);
+        ASIC_LOGW(TAG, "Invalid job nonce found, id=%d", rx_job_id);
         return NULL;
     }
-    result.job = *GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[rx_job_id];
-    pthread_mutex_unlock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
+    result.job = *state->active_jobs[rx_job_id];
+    pthread_mutex_unlock(&state->valid_jobs_lock);
 
     uint32_t rolled_version = result.job.version;
     for (int i = 0; i < rx_midstate_index; i++)
@@ -369,9 +365,9 @@ task_result *BM1397_process_work(GlobalState * GLOBAL_STATE)
     return &result;
 }
 
-void BM1397_read_registers(GlobalState * GLOBAL_STATE)
+void BM1397_read_registers(asic_context_t * state)
 {
-    uint16_t asic_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
+    uint16_t asic_count = state->config.asic_count;
     if (asic_count == 0 || address_interval <= 0) {
         return;
     }
@@ -382,7 +378,7 @@ void BM1397_read_registers(GlobalState * GLOBAL_STATE)
         for (int reg = 0; reg < size; reg++) {
             if (REGISTER_MAP[reg] != REGISTER_INVALID) {
                 _send_BM1397((TYPE_CMD | GROUP_SINGLE | CMD_READ), (uint8_t[]){chip_addr, reg}, 2, BM1397_SERIALTX_DEBUG);
-                vTaskDelay(pdMS_TO_TICKS(1));
+                asic_delay_ms(1);
             }
         }
     }

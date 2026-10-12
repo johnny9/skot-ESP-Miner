@@ -3,9 +3,9 @@
 
 #include "asic_job.h"
 
-typedef struct GlobalState GlobalState;
+#include "asic_context.h"
 
 /* Takes ownership of the common job and dispatches it to the selected driver. */
-void ASIC_send_work(GlobalState *state, asic_job_t *job);
+void ASIC_send_work(asic_context_t *state, asic_job_t *job);
 
 #endif

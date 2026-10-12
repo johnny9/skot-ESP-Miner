@@ -34,4 +34,12 @@ typedef struct asic_job {
 void asic_job_header(const asic_job_t *job, uint32_t nonce,
                      uint32_t version, uint8_t header[80]);
 
+// BIP320 bits 13..28 supported by BM13xx version rolling.
+#define BIP320_VERSION_ROLLING_MASK 0x1fffe000U
+uint32_t increment_bitmask(uint32_t value, uint32_t mask);
+// Accepts unaligned buffers; source and destination must not overlap.
+void reverse_32bit_words(const uint8_t src[32], uint8_t dest[32]);
+
+void reverse_endianness_per_word(uint8_t data[32]);
+
 #endif

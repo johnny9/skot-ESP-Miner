@@ -6,14 +6,14 @@
 #include "asic_job.h"
 #include "asic_common.h"
 
-typedef struct GlobalState GlobalState;
+#include "asic_context.h"
 
 enum { BM1397_HARNESS_RESPONSE_SIZE = 9 };
 
 typedef struct {
-    uint8_t (*init)(GlobalState *state);
-    void (*send_work)(GlobalState *state, asic_job_t *job);
-    task_result *(*process_work)(GlobalState *state);
+    uint8_t (*init)(asic_context_t *state);
+    void (*send_work)(asic_context_t *state, asic_job_t *job);
+    task_result *(*process_work)(asic_context_t *state);
 } bm1397_harness_driver_t;
 
 typedef struct {
@@ -23,7 +23,7 @@ typedef struct {
 
 extern const bm1397_harness_driver_t bm1397_harness_driver;
 
-GlobalState *bm1397_harness_begin(void);
+asic_context_t *bm1397_harness_begin(void);
 void bm1397_harness_end(void);
 void bm1397_harness_clear_packets(void);
 size_t bm1397_harness_packet_count(void);

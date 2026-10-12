@@ -7,16 +7,16 @@
 #include "asic_job.h"
 #include "asic_common.h"
 
-typedef struct GlobalState GlobalState;
+#include "asic_context.h"
 
 enum { BM13XX_HARNESS_DRIVER_COUNT = 4, BM13XX_HARNESS_RESPONSE_SIZE = 11 };
 
 typedef struct {
     const char *name;
-    uint8_t (*init)(GlobalState *state);
-    void (*send_work)(GlobalState *state, asic_job_t *job);
+    uint8_t (*init)(asic_context_t *state);
+    void (*send_work)(asic_context_t *state, asic_job_t *job);
     void (*set_version_mask)(uint32_t mask);
-    task_result *(*process_work)(GlobalState *state);
+    task_result *(*process_work)(asic_context_t *state);
     uint8_t response_job_id;
     uint8_t init_mask_count;
 } bm13xx_harness_driver_t;
@@ -29,7 +29,7 @@ typedef struct {
 extern const bm13xx_harness_driver_t
     bm13xx_harness_drivers[BM13XX_HARNESS_DRIVER_COUNT];
 
-GlobalState *bm13xx_harness_begin(void);
+asic_context_t *bm13xx_harness_begin(void);
 void bm13xx_harness_end(void);
 void bm13xx_harness_clear_packets(void);
 size_t bm13xx_harness_packet_count(void);

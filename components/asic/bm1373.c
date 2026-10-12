@@ -2,14 +2,10 @@
 #include "bm1373.h"
 
 #include "crc.h"
-#include "global_state.h"
-#include "mining.h"
+#include "asic_context.h"
 #include "serial.h"
-#include "utils.h"
 
-#include "esp_log.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
+#include "asic_platform.h"
 #include "frequency_transition_bmXX.h"
 #include "pll.h"
 
@@ -144,7 +140,7 @@ static bool _send_BM1373(uint8_t header, const uint8_t * data, uint8_t data_len,
     uint8_t total_length = (packet_type == JOB_PACKET) ? (data_len + 6) : (data_len + 5);
 
     if (total_length > 128) {
-        ESP_LOGE(TAG, "Packet length %d exceeds maximum buffer size", total_length);
+        ASIC_LOGE(TAG, "Packet length %d exceeds maximum buffer size", total_length);
         return false;
     }
 
@@ -178,14 +174,14 @@ static bool _send_BM1373(uint8_t header, const uint8_t * data, uint8_t data_len,
             return true;
         }
 
-        ESP_LOGW(TAG, "ASIC write failed (%d/%u bytes), attempt %u/%u",
+        ASIC_LOGW(TAG, "ASIC write failed (%d/%u bytes), attempt %u/%u",
                  bytes_written, total_length, attempt, BM1372_WRITE_RETRIES);
         if (attempt < BM1372_WRITE_RETRIES) {
-            vTaskDelay(pdMS_TO_TICKS(BM1372_WRITE_RETRY_DELAY_MS));
+            asic_delay_ms(BM1372_WRITE_RETRY_DELAY_MS);
         }
     }
 
-    ESP_LOGE(TAG, "ASIC write failed after %u attempts", BM1372_WRITE_RETRIES);
+    ASIC_LOGE(TAG, "ASIC write failed after %u attempts", BM1372_WRITE_RETRIES);
     return false;
 }
 
@@ -236,14 +232,14 @@ void BM1373_set_version_mask(uint32_t version_mask)
     uint32_t versions_to_roll = version_mask >> 13;
     uint32_t value = 0x90000000 | (versions_to_roll & 0xFFFF);
     if (!_write_broadcast(BM1372_REGISTER_VERSION_ROLLING, value)) {
-        ESP_LOGE(TAG, "Failed to set version mask");
+        ASIC_LOGE(TAG, "Failed to set version mask");
     }
 }
 
 void BM1373_set_hash_counting_number(uint32_t hcn)
 {
     if (!_write_broadcast(BM1372_REGISTER_HASH_COUNTING_NUMBER, hcn)) {
-        ESP_LOGE(TAG, "Failed to set hash counting number");
+        ASIC_LOGE(TAG, "Failed to set hash counting number");
     }
 }
 
@@ -278,17 +274,17 @@ float BM1373_send_hash_frequency(float target_freq)
 
     if (!success) {
         frequency_write_failed = true;
-        ESP_LOGE(TAG, "Failed to program one or more ASIC PLLs");
+        ASIC_LOGE(TAG, "Failed to program one or more ASIC PLLs");
     }
 
-    ESP_LOGI(TAG, "Setting Frequency to %g MHz (%g)", target_freq, frequency);
+    ASIC_LOGI(TAG, "Setting Frequency to %g MHz (%g)", target_freq, frequency);
 
     return frequency;
 }
 
-uint8_t BM1373_init(GlobalState * GLOBAL_STATE)
+uint8_t BM1373_init(asic_context_t * state)
 {
-    uint8_t expected_chip_count = GLOBAL_STATE->DEVICE_CONFIG.family.asic_count;
+    uint8_t expected_chip_count = state->config.asic_count;
 
     chip_command_address_interval = 0;
     chip_response_address_interval = 0;
@@ -309,32 +305,32 @@ uint8_t BM1373_init(GlobalState * GLOBAL_STATE)
                                                       BM1373_CHIP_ID_ALIAS,
                                                       BM1372_CHIP_ID_RESPONSE_LENGTH);
     if (chip_counter != expected_chip_count) {
-        ESP_LOGE(TAG, "Expected %u BM1372/BM1373 ASICs, detected %d",
+        ASIC_LOGE(TAG, "Expected %u BM1372/BM1373 ASICs, detected %d",
                  expected_chip_count, chip_counter);
         return 0;
     }
 
     detected_chip_count = chip_counter;
-    detected_voltage_domains = GLOBAL_STATE->DEVICE_CONFIG.family.voltage_domains;
+    detected_voltage_domains = state->config.voltage_domains;
     chip_command_address_interval = BM1372_SET_ADDRESS_STRIDE >> BM1372_COMMAND_ADDRESS_SHIFT;
     chip_response_address_interval = BM1372_SET_ADDRESS_STRIDE;
     chip_nonce_address_interval = 256 / detected_chip_count;
     if (chip_nonce_address_interval == 0) {
-        ESP_LOGE(TAG, "Invalid nonce address interval for %u ASICs", detected_chip_count);
+        ASIC_LOGE(TAG, "Invalid nonce address interval for %u ASICs", detected_chip_count);
         return 0;
     }
 
     if (!_send_chain_inactive()) {
         return 0;
     }
-    vTaskDelay(pdMS_TO_TICKS(BM1372_INIT_STEP_DELAY_MS));
+    asic_delay_ms(BM1372_INIT_STEP_DELAY_MS);
 
     for (uint8_t chip = 0; chip < detected_chip_count; chip++) {
         if (!_set_chip_address(chip * BM1372_SET_ADDRESS_STRIDE)) {
             return 0;
         }
     }
-    vTaskDelay(pdMS_TO_TICKS(BM1372_INIT_STEP_DELAY_MS));
+    asic_delay_ms(BM1372_INIT_STEP_DELAY_MS);
 
     // Match the stock BM1372 setup order: nonce overflow, ticket mask, IO,
     // ring-oscillator pads, then UART and the staged core initialization.
@@ -344,7 +340,7 @@ uint8_t BM1373_init(GlobalState * GLOBAL_STATE)
     }
 
     uint8_t difficulty_mask[6];
-    get_difficulty_mask(GLOBAL_STATE->DEVICE_CONFIG.family.asic.difficulty, difficulty_mask);
+    get_difficulty_mask(state->config.difficulty, difficulty_mask);
     if (!_send_BM1373(TYPE_CMD | GROUP_ALL | CMD_WRITE, difficulty_mask,
                       sizeof(difficulty_mask), BM1373_SERIALTX_DEBUG)) {
         return 0;
@@ -373,50 +369,50 @@ uint8_t BM1373_init(GlobalState * GLOBAL_STATE)
     if (!_write_broadcast(BM1372_REGISTER_ROSC_PAD_DISABLE, BM1372_ROSC_PAD_DISABLE)) {
         return 0;
     }
-    vTaskDelay(pdMS_TO_TICKS(BM1372_INIT_STEP_DELAY_MS));
+    asic_delay_ms(BM1372_INIT_STEP_DELAY_MS);
 
-    ESP_LOGI(TAG, "Setting ASIC UART to %d baud", BM1372_ASIC_BAUD);
+    ASIC_LOGI(TAG, "Setting ASIC UART to %d baud", BM1372_ASIC_BAUD);
     if (!_write_broadcast(BM1372_REGISTER_AUTO_WORK_CONFIGURATION,
                           BM1372_AUTO_WORK_CONFIGURATION) ||
         !_write_broadcast(BM1372_REGISTER_FAST_UART_CONFIGURATION,
                           BM1372_FAST_UART_3M) ||
-        SERIAL_set_baud(BM1372_ASIC_BAUD) != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to switch BM1372/BM1373 UART to %d baud", BM1372_ASIC_BAUD);
+        SERIAL_set_baud(BM1372_ASIC_BAUD) != ASIC_OK) {
+        ASIC_LOGE(TAG, "Failed to switch BM1372/BM1373 UART to %d baud", BM1372_ASIC_BAUD);
         return 0;
     }
     SERIAL_clear_buffer();
-    vTaskDelay(pdMS_TO_TICKS(BM1372_INIT_STEP_DELAY_MS));
+    asic_delay_ms(BM1372_INIT_STEP_DELAY_MS);
 
     if (!_write_broadcast(BM1372_REGISTER_SOFT_RESET_CONTROL, BM1372_SOFT_RESET_FAST)) {
         return 0;
     }
-    vTaskDelay(pdMS_TO_TICKS(BM1372_FAST_RESET_DELAY_MS));
+    asic_delay_ms(BM1372_FAST_RESET_DELAY_MS);
 
     if (!_write_broadcast(BM1372_REGISTER_MISC_CONTROL, BM1372_RNO_ENABLE)) {
         return 0;
     }
-    vTaskDelay(pdMS_TO_TICKS(BM1372_INIT_STEP_DELAY_MS));
+    asic_delay_ms(BM1372_INIT_STEP_DELAY_MS);
 
     if (!_write_broadcast(BM1372_REGISTER_MISC_CONTROL_ADD, BM1372_CRR_DISABLE)) {
         return 0;
     }
-    vTaskDelay(pdMS_TO_TICKS(BM1372_INIT_STEP_DELAY_MS));
+    asic_delay_ms(BM1372_INIT_STEP_DELAY_MS);
 
     if (!_write_core_register(BM1372_CORE_REGISTER_CLOCK_SELECT_CTRL, BM1372_CLOCK_SELECT)) {
         return 0;
     }
-    vTaskDelay(pdMS_TO_TICKS(BM1372_INIT_STEP_DELAY_MS));
+    asic_delay_ms(BM1372_INIT_STEP_DELAY_MS);
 
     if (!_write_core_register(BM1372_CORE_REGISTER_CLOCK_DELAY_CTRL,
                               BM1372_CLOCK_DELAY_PWTH6_CCDLY2)) {
         return 0;
     }
-    vTaskDelay(pdMS_TO_TICKS(BM1372_INIT_STEP_DELAY_MS));
+    asic_delay_ms(BM1372_INIT_STEP_DELAY_MS);
 
     if (!_write_core_register(BM1372_CORE_REGISTER_CORE_ENABLE, BM1372_CORE_ENABLE)) {
         return 0;
     }
-    vTaskDelay(pdMS_TO_TICKS(BM1372_INIT_STEP_DELAY_MS));
+    asic_delay_ms(BM1372_INIT_STEP_DELAY_MS);
 
     if (!_write_broadcast(BM1372_REGISTER_ANALOG_MUX_CONTROL,
                           BM1372_ANALOG_MUX_TEMPERATURE_DIODE)) {
@@ -424,22 +420,22 @@ uint8_t BM1373_init(GlobalState * GLOBAL_STATE)
     }
 
     // A hardware reset restores the PLL baseline even during a live recovery.
-    GLOBAL_STATE->POWER_MANAGEMENT_MODULE.actual_frequency = 50.0f;
-    do_frequency_transition(GLOBAL_STATE, BM1373_send_hash_frequency);
+    state->actual_frequency_mhz = 50.0f;
+    do_frequency_transition(state, BM1373_send_hash_frequency);
     if (frequency_write_failed) {
         return 0;
     }
 
     if (!_write_broadcast(BM1372_REGISTER_HASH_COUNTING_NUMBER,
                           BM1372_HASH_COUNTING_NUMBER_S21_PRO)) {
-        ESP_LOGE(TAG, "Failed to configure nonce space");
+        ASIC_LOGE(TAG, "Failed to configure nonce space");
         return 0;
     }
 
-    uint32_t versions_to_roll = BIP320_VERSION_ROLLING_MASK >> 13;
+    uint32_t versions_to_roll = state->config.version_mask >> 13;
     if (!_write_broadcast(BM1372_REGISTER_VERSION_ROLLING,
                           0x90000000 | (versions_to_roll & 0xFFFF))) {
-        ESP_LOGE(TAG, "Failed to configure version rolling");
+        ASIC_LOGE(TAG, "Failed to configure version rolling");
         return 0;
     }
 
@@ -455,7 +451,7 @@ int BM1373_set_max_baud(void)
 
 static uint8_t id = 0;
 
-void BM1373_send_work(GlobalState * GLOBAL_STATE, asic_job_t * next_job)
+void BM1373_send_work(asic_context_t * state, asic_job_t * next_job)
 {
     bm13xx_job_packet_t job;
     id = (id + 24) % 128;
@@ -465,36 +461,36 @@ void BM1373_send_work(GlobalState * GLOBAL_STATE, asic_job_t * next_job)
     // (which snapshots active_jobs[job_id] under the same lock) can never observe
     // or copy a slot we are freeing/replacing here. valid_jobs is set inside the
     // same critical section so validity and the pointer stay consistent.
-    pthread_mutex_lock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
-    if (GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id] != NULL) {
-        free(GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id]);
+    pthread_mutex_lock(&state->valid_jobs_lock);
+    if (state->active_jobs[job.job_id] != NULL) {
+        free(state->active_jobs[job.job_id]);
     }
-    GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job.job_id] = next_job;
-    GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs[job.job_id] = 1;
-    pthread_mutex_unlock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
+    state->active_jobs[job.job_id] = next_job;
+    state->valid_jobs[job.job_id] = 1;
+    pthread_mutex_unlock(&state->valid_jobs_lock);
 
     //debug sent jobs - this can get crazy if the interval is short
     #if BM1373_DEBUG_JOBS
-    ESP_LOGI(TAG, "Send Job: %02X", job.job_id);
+    ASIC_LOGI(TAG, "Send Job: %02X", job.job_id);
     #endif
 
     _send_BM1373((TYPE_JOB | GROUP_SINGLE | CMD_WRITE), (uint8_t *)&job, sizeof(job), BM1373_DEBUG_WORK);
 }
 
-task_result * BM1373_process_work(GlobalState * GLOBAL_STATE)
+task_result * BM1373_process_work(asic_context_t * state)
 {
     bm1373_asic_result_t asic_result = {0};
 
     memset(&result, 0, sizeof(task_result));
 
-    if (receive_work((uint8_t *)&asic_result, sizeof(asic_result), &result.timestamp_us) == ESP_FAIL) {
+    if (receive_work((uint8_t *)&asic_result, sizeof(asic_result), &result.timestamp_us) == ASIC_FAIL) {
         return NULL;
     }
 
     if (!asic_result.is_job_response) {
         result.register_type = REGISTER_MAP[asic_result.cmd.register_address];
         if (result.register_type == REGISTER_INVALID) {
-            ESP_LOGW(TAG, "Unknown register read: %02x", asic_result.cmd.register_address);
+            ASIC_LOGW(TAG, "Unknown register read: %02x", asic_result.cmd.register_address);
             return NULL;
         }
         result.asic_nr = asic_result.cmd.asic_address / chip_response_address_interval;
@@ -505,10 +501,10 @@ task_result * BM1373_process_work(GlobalState * GLOBAL_STATE)
 
     // uint8_t job_id = asic_result.job_id;
     // uint8_t rx_job_id = ((int8_t)job_id & 0xf0) >> 1;
-    // ESP_LOGI(TAG, "Job ID: %02X, RX: %02X", job_id, rx_job_id);
+    // ASIC_LOGI(TAG, "Job ID: %02X, RX: %02X", job_id, rx_job_id);
 
     // uint8_t job_id = asic_result.job_id & 0xf8;
-    // ESP_LOGI(TAG, "Job ID: %02X, Core: %01X", job_id, asic_result.job_id & 0x07);
+    // ASIC_LOGI(TAG, "Job ID: %02X, Core: %01X", job_id, asic_result.job_id & 0x07);
 
     uint8_t job_id = (asic_result.job.id & 0xf0) >> 1;
     uint32_t nonce_h = ntohl(asic_result.job.nonce);
@@ -518,15 +514,15 @@ task_result * BM1373_process_work(GlobalState * GLOBAL_STATE)
     uint32_t version_bits = (ntohs(asic_result.job.version) << 13);
 
     // Capture the job and its rolled version together before the slot can change.
-    pthread_mutex_lock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
-    if (job_id >= MAX_ASIC_JOBS || GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs[job_id] == 0 || GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id] == NULL) {
-        pthread_mutex_unlock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
-        ESP_LOGW(TAG, "Invalid job nonce found, 0x%02X", job_id);
+    pthread_mutex_lock(&state->valid_jobs_lock);
+    if (job_id >= MAX_ASIC_JOBS || state->valid_jobs[job_id] == 0 || state->active_jobs[job_id] == NULL) {
+        pthread_mutex_unlock(&state->valid_jobs_lock);
+        ASIC_LOGW(TAG, "Invalid job nonce found, 0x%02X", job_id);
         return NULL;
     }
-    result.job = *GLOBAL_STATE->ASIC_TASK_MODULE.active_jobs[job_id];
+    result.job = *state->active_jobs[job_id];
     result.rolled_version = result.job.version | version_bits;
-    pthread_mutex_unlock(&GLOBAL_STATE->ASIC_TASK_MODULE.valid_jobs_lock);
+    pthread_mutex_unlock(&state->valid_jobs_lock);
 
     result.nonce = asic_result.job.nonce;
     result.asic_nr = asic_nr;
@@ -543,7 +539,7 @@ void BM1373_read_registers(void)
     for (int reg = 0; reg < size; reg++) {
         if (REGISTER_MAP[reg] != REGISTER_INVALID) {
             _send_BM1373((TYPE_CMD | GROUP_ALL | CMD_READ), (uint8_t[]){0x00, reg}, 2, BM1373_SERIALTX_DEBUG);
-            vTaskDelay(pdMS_TO_TICKS(1));
+            asic_delay_ms(1);
         }
     }
 }

@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.16)
+project(asic_host_example LANGUAGES C)
+add_subdirectory(../../components/asic asic)
+add_executable(asic_host main.c)
+target_link_libraries(asic_host PRIVATE asic::asic)

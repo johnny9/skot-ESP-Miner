@@ -1,3 +1,4 @@
+#include "miner_asic.h"
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
@@ -119,7 +120,7 @@ static void self_test_domain_averages_prime(GlobalState * GLOBAL_STATE, SelfTest
     for (int asic_nr = 0; asic_nr < averages->asic_count; asic_nr++) {
         for (int domain_nr = 0; domain_nr < averages->hash_domains; domain_nr++) {
             asic_domain_measurement_t measurement;
-            if (ASIC_get_domain_measurement(GLOBAL_STATE, asic_nr, domain_nr, &measurement) != ESP_OK) {
+            if (miner_asic_get_domain_measurement(GLOBAL_STATE, asic_nr, domain_nr, &measurement) != ESP_OK) {
                 continue;
             }
             SelfTestDomainAverage * average = self_test_domain_get(averages, asic_nr, domain_nr);
@@ -141,7 +142,7 @@ static void self_test_domain_averages_sample(GlobalState * GLOBAL_STATE,
     for (int asic_nr = 0; asic_nr < averages->asic_count; asic_nr++) {
         for (int domain_nr = 0; domain_nr < averages->hash_domains; domain_nr++) {
             asic_domain_measurement_t measurement;
-            if (ASIC_get_domain_measurement(GLOBAL_STATE, asic_nr, domain_nr, &measurement) != ESP_OK) {
+            if (miner_asic_get_domain_measurement(GLOBAL_STATE, asic_nr, domain_nr, &measurement) != ESP_OK) {
                 continue;
             }
             SelfTestDomainAverage * average = self_test_domain_get(averages, asic_nr, domain_nr);

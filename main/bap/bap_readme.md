@@ -229,3 +229,14 @@ UART settings:
 - Use a serial terminal to manually send commands
 - Monitor UART buffer status for overflow conditions
 - Check mutex acquisition failures in logs
+
+## Bonanza 1004 serial display
+
+Bonanza 1004 enables the existing BAP host on UART2 at 115200 baud, 8N1,
+using ESP32 TX GPIO39 and RX GPIO40. The ASIC bridge uses UART1 on GPIO17/18.
+Set `CONFIG_ENABLE_BAP=n` to disable the accessory, or use the existing BAP
+GPIO overrides to select other pins. Keep the local LVGL display set to `NONE`;
+the serial accessory runs its own display firmware.
+
+The display can use the existing identity request and telemetry subscriptions.
+This board configuration change does not add frequency reporting to BAP.

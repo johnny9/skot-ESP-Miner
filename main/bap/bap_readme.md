@@ -239,4 +239,10 @@ GPIO overrides to select other pins. Keep the local LVGL display set to `NONE`;
 the serial accessory runs its own display firmware.
 
 The display can use the existing identity request and telemetry subscriptions.
-This board configuration change does not add frequency reporting to BAP.
+To receive actual ASIC frequency in MHz without polling, subscribe with
+`$BAP,SUB,frequency,1000*5E\r\n`. The host sends a `RES,frequency` snapshot
+on the next eligible update and pushes changed values at the requested interval,
+serviced by the existing one-second subscription task. Renew the subscription
+before its five-minute expiry; renewal also sends a fresh snapshot. Send
+`$BAP,UNSUB,frequency*68\r\n` to stop updates. Existing requests, subscriptions,
+and the `systemInfo` response sequence retain their current behavior.

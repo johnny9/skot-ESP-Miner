@@ -29,6 +29,7 @@ static TaskHandle_t subscription_task_handle = NULL;
 
 typedef struct {
     char hashrate[32];
+    char frequency[32];
     char chip_temp[32];
     char vr_temp[32];
     char power[32];
@@ -47,6 +48,7 @@ typedef struct {
 
 typedef struct {
     bool hashrate;
+    bool frequency;
     bool chip_temp;
     bool vr_temp;
     bool power;
@@ -119,6 +121,9 @@ void BAP_subscription_handle_subscribe(const char *parameter, const char *value)
         switch (param) {
             case BAP_PARAM_HASHRATE:
                 last_values_valid.hashrate = false;
+                break;
+            case BAP_PARAM_FREQUENCY:
+                last_values_valid.frequency = false;
                 break;
             case BAP_PARAM_TEMPERATURE:
                 last_values_valid.chip_temp = false;
@@ -249,6 +254,14 @@ void BAP_send_subscription_update(GlobalState *state) {
                         }
                         break;
                         
+                    case BAP_PARAM_FREQUENCY:
+                        {
+                            char frequency_str[32];
+                            snprintf(frequency_str, sizeof(frequency_str), "%.2f", state->POWER_MANAGEMENT_MODULE.actual_frequency);
+                            BAP_send_if_changed("frequency", frequency_str, last_values.frequency, sizeof(last_values.frequency), &last_values_valid.frequency);
+                        }
+                        break;
+
                     case BAP_PARAM_TEMPERATURE:
                         {
                             char temp_str[32];

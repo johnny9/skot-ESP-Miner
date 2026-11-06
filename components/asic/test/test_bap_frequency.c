@@ -199,7 +199,7 @@ TEST_CASE("BAP frequency retains AP gating and legacy subscription input handlin
     }
 }
 
-TEST_CASE("BAP frequency is opt-in and preserves identity and existing subscriptions", "[asic][bap][frequency]")
+TEST_CASE("BAP identity appends frequency after existing replies and preserves subscriptions", "[asic][bap][frequency]")
 {
     GlobalState *state = fixture();
     command("BAP,REQ,systemInfo", 1);
@@ -208,7 +208,8 @@ TEST_CASE("BAP frequency is opt-in and preserves identity and existing subscript
     expect(2, BAP_CMD_RES, "pool", "pool.example");
     expect(3, BAP_CMD_RES, "poolPort", "3333");
     expect(4, BAP_CMD_RES, "poolUser", "miner");
-    TEST_ASSERT_EQUAL(5, sent);
+    expect(5, BAP_CMD_RES, "frequency", "800.00");
+    TEST_ASSERT_EQUAL(6, sent);
     sent = 0;
     command("BAP,SUB,hashrate,1000", 1);
     command("BAP,SUB,frequency,1000", 1);
@@ -230,5 +231,64 @@ TEST_CASE("BAP frequency is opt-in and preserves identity and existing subscript
     BAP_send_subscription_update(state);
     expect(6, BAP_CMD_RES, "hashrate", "2222.00");
     TEST_ASSERT_EQUAL(7, sent);
+    release_fixture(state);
+}
+
+TEST_CASE("BAP one-shot telemetry reads return current values without creating subscriptions", "[asic][bap][requests]")
+{
+    GlobalState *state = fixture();
+    state->POWER_MANAGEMENT_MODULE.chip_temp_avg = 58.25f;
+    state->POWER_MANAGEMENT_MODULE.vr_temp = 40.5f;
+    state->POWER_MANAGEMENT_MODULE.power = 17.6f;
+    state->POWER_MANAGEMENT_MODULE.fan_rpm = 4200;
+    strcpy(state->SYSTEM_MODULE.best_diff_string, "123T");
+    strcpy(state->SYSTEM_MODULE.ip_addr_str, "192.168.1.234");
+    const char *requests[] = {"frequency", "hashrate", "temperature", "power",
+                              "fan_speed", "best_difficulty", "wifi"};
+    for (unsigned i = 0; i < sizeof(requests) / sizeof(requests[0]); ++i) {
+        char body[64];
+        snprintf(body, sizeof(body), "BAP,REQ,%s", requests[i]);
+        command(body, 1);
+    }
+    expect(0, BAP_CMD_RES, "frequency", "800.00");
+    expect(1, BAP_CMD_RES, "hashrate", "1200.55");
+    expect(2, BAP_CMD_RES, "chipTemp", "58.250000");
+    expect(3, BAP_CMD_RES, "vrTemp", "40.500000");
+    expect(4, BAP_CMD_RES, "power", "17.60");
+    expect(5, BAP_CMD_RES, "fan_speed", "4200");
+    expect(6, BAP_CMD_RES, "best_difficulty", "123T");
+    expect(7, BAP_CMD_RES, "wifi_ip", "192.168.1.234");
+    TEST_ASSERT_EQUAL(8, sent);
+    state->SYSTEM_MODULE.current_hashrate = 0;
+    state->POWER_MANAGEMENT_MODULE.power = 0;
+    command("BAP,REQ,hashrate", 1);
+    expect(8, BAP_CMD_RES, "hashrate", "0.00");
+    command("BAP,REQ,power", 1);
+    expect(9, BAP_CMD_RES, "power", "0.00");
+    clock_us += 5000000;
+    BAP_send_subscription_update(state);
+    TEST_ASSERT_EQUAL(10, sent);
+    release_fixture(state);
+}
+
+TEST_CASE("BAP telemetry reads retain AP gating and legacy request-field handling", "[asic][bap][requests]")
+{
+    GlobalState *state = fixture();
+    state->SYSTEM_MODULE.is_connected = false;
+    command("BAP,REQ,frequency", 1);
+    expect(0, BAP_CMD_ERR, "frequency", "ap_mode_no_requests");
+    state->SYSTEM_MODULE.is_connected = true;
+    clock_us += 1100000;
+    command("BAP,REQ,frequency", 1);
+    expect(1, BAP_CMD_RES, "frequency", "800.00");
+    clock_us += 100000;
+    command("BAP,REQ,frequency", 1);
+    TEST_ASSERT_EQUAL(2, sent);
+    command("BAP,REQ,shares,legacy", 1);
+    expect(2, BAP_CMD_RES, "shares", "0/0");
+    command("BAP,REQ,hashrate,legacy", 1);
+    expect(3, BAP_CMD_RES, "hashrate", "1200.55");
+    command("BAP,REQ,futureMetric", 1);
+    TEST_ASSERT_EQUAL(4, sent);
     release_fixture(state);
 }

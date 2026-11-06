@@ -239,10 +239,17 @@ GPIO overrides to select other pins. Keep the local LVGL display set to `NONE`;
 the serial accessory runs its own display firmware.
 
 The display can use the existing identity request and telemetry subscriptions.
+The identity response keeps its existing replies and appends actual ASIC
+frequency in MHz; clients that do not use that property can ignore it.
+One-shot requests also support frequency, hashrate, temperature, power, fan RPM,
+best difficulty and WiFi IP through the existing parameter names. These reads
+return the same values and units as the corresponding subscription updates
+without activating a subscription.
 To receive actual ASIC frequency in MHz without polling, subscribe with
 `$BAP,SUB,frequency,1000*5E\r\n`. The host sends a `RES,frequency` snapshot
 on the next eligible update and pushes changed values at the requested interval,
 serviced by the existing one-second subscription task. Renew the subscription
 before its five-minute expiry; renewal also sends a fresh snapshot. Send
-`$BAP,UNSUB,frequency*68\r\n` to stop updates. Existing requests, subscriptions,
-and the `systemInfo` response sequence retain their current behavior.
+`$BAP,UNSUB,frequency*68\r\n` to stop updates. Previously supported requests
+and subscriptions retain their behavior, and the existing parser, checksum
+acceptance and interval handling remain unchanged.

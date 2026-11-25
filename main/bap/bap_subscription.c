@@ -21,11 +21,18 @@
 #include "bap.h"
 #include "connect.h"
 #include "nvs_config.h"
+#include "system.h"
+#include "asic.h"
+#include <math.h>
 
 static const char *TAG = "BAP_SUBSCRIPTION";
 
 static bap_subscription_t subscriptions[BAP_PARAM_UNKNOWN] = {0};
 static TaskHandle_t subscription_task_handle = NULL;
+
+// Per-chip lists for accessories: up to four chips of up to four domains.
+#define BAP_MAX_CHIPS 4
+#define BAP_CHIP_LIST_LEN 96 // 16 values of up to five digits, separators and NUL
 
 typedef struct {
     char hashrate[32];
@@ -44,6 +51,16 @@ typedef struct {
     char wifi_rssi[32];
     char wifi_ip[32];
     char found_block[16];
+    char network_target[65];
+    char best_share_hash[65];
+    char last_share_hash[65];
+    char asic_temp[BAP_CHIP_LIST_LEN];
+    char asic_voltage[BAP_CHIP_LIST_LEN];
+    char asic_frequency[BAP_CHIP_LIST_LEN];
+    char asic_hashrate[BAP_CHIP_LIST_LEN];
+    char domain_voltage[BAP_CHIP_LIST_LEN];
+    char domain_frequency[BAP_CHIP_LIST_LEN];
+    char domain_hashrate[BAP_CHIP_LIST_LEN];
 } bap_last_values_t;
 
 typedef struct {
@@ -63,12 +80,130 @@ typedef struct {
     bool wifi_rssi;
     bool wifi_ip;
     bool found_block;
+    bool network_target;
+    bool best_share_hash;
+    bool last_share_hash;
+    bool asic_temp;
+    bool asic_voltage;
+    bool asic_frequency;
+    bool asic_hashrate;
+    bool domain_voltage;
+    bool domain_frequency;
+    bool domain_hashrate;
 } bap_last_values_valid_t;
 
 static bap_last_values_t last_values = {0};
 static bap_last_values_valid_t last_values_valid = {0};
 
 static void subscription_update_task(void *pvParameters);
+static void BAP_send_if_changed(const char *parameter, const char *value, char *last, size_t last_size, bool *is_valid);
+
+// "v,v,v" with one whole number per chip, or "a/b,a/b" with one per domain.
+// Returns false, leaving nothing to send, if any value is missing or negative.
+static bool format_chip_table(char *out, size_t size, const float values[][ASIC_DETAIL_MAX_DOMAINS],
+                              size_t chips, size_t domains)
+{
+    size_t used = 0;
+    out[0] = '\0';
+    if (chips == 0 || domains == 0) return false;
+    for (size_t chip = 0; chip < chips; ++chip) {
+        for (size_t domain = 0; domain < domains; ++domain) {
+            float value = values[chip][domain];
+            if (!isfinite(value) || value < 0) return false;
+            const char *separator = chip == 0 && domain == 0 ? "" : domain == 0 ? "," : "/";
+            int n = snprintf(out + used, size - used, "%s%.0f", separator, value);
+            if (n < 0 || (size_t)n >= size - used) return false;
+            used += (size_t)n;
+        }
+    }
+    return true;
+}
+
+static void send_chip_table(const char *parameter, const float values[][ASIC_DETAIL_MAX_DOMAINS],
+                            size_t chips, size_t domains, char *last, bool *is_valid)
+{
+    char text[BAP_CHIP_LIST_LEN];
+    if (format_chip_table(text, sizeof(text), values, chips, domains)) {
+        BAP_send_if_changed(parameter, text, last, BAP_CHIP_LIST_LEN, is_valid);
+    }
+}
+
+// The per-chip and per-domain lists behind bonanzaDisplay's ASIC page. Each
+// list is sent only when every chip has a value for it.
+static void send_chip_details(GlobalState *state)
+{
+    size_t chips = state->DEVICE_CONFIG.family.asic_count;
+    if (chips == 0 || chips > BAP_MAX_CHIPS) return;
+
+    asic_chip_detail_t details[BAP_MAX_CHIPS];
+    size_t detailed = ASIC_get_chip_details(state, details, BAP_MAX_CHIPS);
+    size_t domains = detailed == chips ? details[0].domain_count : 0;
+    bool all_temperature = domains > 0, all_voltage = domains > 0, all_frequency = domains > 0;
+    for (size_t chip = 0; chip < detailed; ++chip) {
+        if (details[chip].domain_count != domains) domains = 0;
+        all_temperature &= details[chip].has_temperature;
+        all_voltage &= details[chip].has_voltage;
+        all_frequency &= details[chip].has_frequency;
+    }
+    if (domains == 0 || domains > ASIC_DETAIL_MAX_DOMAINS) {
+        all_temperature = all_voltage = all_frequency = false;
+        domains = 0;
+    }
+
+    float table[BAP_MAX_CHIPS][ASIC_DETAIL_MAX_DOMAINS];
+    if (all_temperature) {
+        for (size_t chip = 0; chip < chips; ++chip) table[chip][0] = details[chip].temperature_c;
+        send_chip_table("asicTemp", table, chips, 1, last_values.asic_temp, &last_values_valid.asic_temp);
+    }
+    if (all_voltage) {
+        // The domains of a chip are in series, so the chip's voltage is their sum.
+        for (size_t chip = 0; chip < chips; ++chip) {
+            table[chip][0] = 0;
+            for (size_t domain = 0; domain < domains; ++domain) table[chip][0] += details[chip].domain_voltage_mv[domain];
+        }
+        send_chip_table("asicVoltage", table, chips, 1, last_values.asic_voltage, &last_values_valid.asic_voltage);
+        for (size_t chip = 0; chip < chips; ++chip) memcpy(table[chip], details[chip].domain_voltage_mv, sizeof(table[chip]));
+        send_chip_table("domainVoltage", table, chips, domains, last_values.domain_voltage, &last_values_valid.domain_voltage);
+    }
+    if (all_frequency) {
+        // A chip's frequency is the mean of its domain clocks.
+        for (size_t chip = 0; chip < chips; ++chip) {
+            table[chip][0] = 0;
+            for (size_t domain = 0; domain < domains; ++domain) table[chip][0] += details[chip].domain_frequency_mhz[domain];
+            table[chip][0] /= (float)domains;
+        }
+        send_chip_table("asicFrequency", table, chips, 1, last_values.asic_frequency, &last_values_valid.asic_frequency);
+        for (size_t chip = 0; chip < chips; ++chip) memcpy(table[chip], details[chip].domain_frequency_mhz, sizeof(table[chip]));
+        send_chip_table("domainFrequency", table, chips, domains, last_values.domain_frequency, &last_values_valid.domain_frequency);
+    }
+
+    bool all_hashrate = true;
+    for (size_t chip = 0; chip < chips && all_hashrate; ++chip) {
+        asic_domain_measurement_t measurement = {0};
+        all_hashrate = ASIC_get_asic_measurement(state, (uint8_t)chip, &measurement) == ESP_OK;
+        table[chip][0] = measurement.hashrate;
+    }
+    if (all_hashrate) {
+        send_chip_table("asicHashrate", table, chips, 1, last_values.asic_hashrate, &last_values_valid.asic_hashrate);
+    }
+
+    // Hash-counting domains are only sent when they cannot be confused with
+    // the rail/clock domains above: BZM counts per chip, so it sends none.
+    size_t hash_domains = state->DEVICE_CONFIG.family.asic.hash_domains;
+    if (hash_domains > 1 && hash_domains <= ASIC_DETAIL_MAX_DOMAINS && (domains == 0 || domains == hash_domains)) {
+        bool all_domain_hashrate = true;
+        for (size_t chip = 0; chip < chips && all_domain_hashrate; ++chip) {
+            for (size_t domain = 0; domain < hash_domains && all_domain_hashrate; ++domain) {
+                asic_domain_measurement_t measurement = {0};
+                all_domain_hashrate = ASIC_get_domain_measurement(state, (uint8_t)chip, (uint8_t)domain, &measurement) == ESP_OK;
+                table[chip][domain] = measurement.hashrate;
+            }
+        }
+        if (all_domain_hashrate) {
+            send_chip_table("domainHashrate", table, chips, hash_domains, last_values.domain_hashrate, &last_values_valid.domain_hashrate);
+        }
+    }
+}
 
 static void BAP_send_if_changed(const char *parameter, const char *value, char *last, size_t last_size, bool *is_valid) {
     const char *safe_value = value ? value : "";
@@ -128,6 +263,13 @@ void BAP_subscription_handle_subscribe(const char *parameter, const char *value)
             case BAP_PARAM_TEMPERATURE:
                 last_values_valid.chip_temp = false;
                 last_values_valid.vr_temp = false;
+                last_values_valid.asic_temp = false;
+                last_values_valid.asic_voltage = false;
+                last_values_valid.asic_frequency = false;
+                last_values_valid.asic_hashrate = false;
+                last_values_valid.domain_voltage = false;
+                last_values_valid.domain_frequency = false;
+                last_values_valid.domain_hashrate = false;
                 break;
             case BAP_PARAM_POWER:
                 last_values_valid.power = false;
@@ -146,9 +288,12 @@ void BAP_subscription_handle_subscribe(const char *parameter, const char *value)
                 break;
             case BAP_PARAM_BEST_DIFFICULTY:
                 last_values_valid.best_difficulty = false;
+                last_values_valid.best_share_hash = false;
+                last_values_valid.last_share_hash = false;
                 break;
             case BAP_PARAM_BLOCK_HEIGHT:
                 last_values_valid.block_height = false;
+                last_values_valid.network_target = false;
                 break;
             case BAP_PARAM_WIFI:
                 last_values_valid.wifi_ssid = false;
@@ -270,6 +415,8 @@ void BAP_send_subscription_update(GlobalState *state) {
                             
                             snprintf(temp_str, sizeof(temp_str), "%f", state->POWER_MANAGEMENT_MODULE.vr_temp);
                             BAP_send_if_changed("vrTemp", temp_str, last_values.vr_temp, sizeof(last_values.vr_temp), &last_values_valid.vr_temp);
+
+                            send_chip_details(state);
                         }
                         break;
                         
@@ -319,6 +466,16 @@ void BAP_send_subscription_update(GlobalState *state) {
                             char best_diff_str[32];
                             snprintf(best_diff_str, sizeof(best_diff_str), "%s", state->SYSTEM_MODULE.best_diff_string);
                             BAP_send_if_changed("best_difficulty", best_diff_str, last_values.best_difficulty, sizeof(last_values.best_difficulty), &last_values_valid.best_difficulty);
+
+                            // 64 hex digits each; unknown values are not sent.
+                            char network_target[65], best_share[65], last_share[65];
+                            SYSTEM_get_display_hashes(state, network_target, best_share, last_share);
+                            if (best_share[0]) {
+                                BAP_send_if_changed("bestShareHash", best_share, last_values.best_share_hash, sizeof(last_values.best_share_hash), &last_values_valid.best_share_hash);
+                            }
+                            if (last_share[0]) {
+                                BAP_send_if_changed("lastShareHash", last_share, last_values.last_share_hash, sizeof(last_values.last_share_hash), &last_values_valid.last_share_hash);
+                            }
                         }
                         break;
 
@@ -327,6 +484,13 @@ void BAP_send_subscription_update(GlobalState *state) {
                             char block_height_str[32];
                             snprintf(block_height_str, sizeof(block_height_str), "%d", state->block_height);
                             BAP_send_if_changed("block_height", block_height_str, last_values.block_height, sizeof(last_values.block_height), &last_values_valid.block_height);
+
+                            // The network target changes with the job's nBits, so it rides with block height.
+                            char network_target[65], best_share[65], last_share[65];
+                            SYSTEM_get_display_hashes(state, network_target, best_share, last_share);
+                            if (network_target[0]) {
+                                BAP_send_if_changed("networkTarget", network_target, last_values.network_target, sizeof(last_values.network_target), &last_values_valid.network_target);
+                            }
                         }
                         break;
 

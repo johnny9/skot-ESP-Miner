@@ -94,7 +94,9 @@ The BAP implementation is organized into several modules:
 #### Mode Awareness
 BAP operates differently based on the device's WiFi connection status:
 - **Connected Mode**: Full functionality available
-- **AP Mode**: Limited functionality for WiFi configuration
+- **AP Mode**: Limited functionality for WiFi configuration. Every five
+  seconds while WiFi is not connected the host sends `CMD,mode,ap_mode`, and
+  while its setup access point is up, also `RES,apSsid,<name>`
 
 #### Subscription Management
 - Clients can subscribe to real-time parameter updates
@@ -253,3 +255,68 @@ before its five-minute expiry; renewal also sends a fresh snapshot. Send
 `$BAP,UNSUB,frequency*68\r\n` to stop updates. Previously supported requests
 and subscriptions retain their behavior, and the existing parser, checksum
 acceptance and interval handling remain unchanged.
+
+### Dashboard fields for bonanzaDisplay
+
+The `systemInfo` reply also carries these properties. Each is sent only once
+the host has a value, so clients should keep their own fallback until then.
+
+| Property | Value |
+| --- | --- |
+| `networkDifficulty` | Network difficulty, formatted like `best_difficulty` (for example `129.44T`) |
+| `hostname` | The configured host name |
+| `networkTarget` | The current job's network target, expanded from `nBits` |
+| `bestShareHash` | Hash of the all-time best share |
+| `lastShareHash` | Hash of the most recent result that met the pool or network target |
+
+The three hash-like values are 256-bit numbers written as exactly 64 lowercase
+hex digits, most significant first (the way a block explorer prints a block
+hash). They are also pushed on change by existing subscriptions:
+`bestShareHash` and `lastShareHash` with `best_difficulty`, and
+`networkTarget` with `block_height`. Only the best difficulty is stored across
+restarts, so after a restart `bestShareHash` is not sent until that stored best
+is beaten.
+
+### Per-chip lists for bonanzaDisplay's ASIC page
+
+While `temperature` is subscribed, the host also pushes these lists on change,
+for boards with one to four chips. A chip-level list has one whole number per
+chip, separated by commas; a domain list gives each chip's domains separated by
+`/`. A list is sent only when every chip has a value for it.
+
+| Property | Example | Unit |
+| --- | --- | --- |
+| `asicTemp` | `58,57,60,59` | °C |
+| `asicHashrate` | `752,748,760,741` | GH/s |
+| `asicFrequency` | `800,800,800,800` | MHz, the mean of the chip's domain clocks |
+| `asicVoltage` | `702,698,705,700` | mV, the sum of the chip's domain rails |
+| `domainVoltage` | `351/351,349/349,353/352,350/350` | mV |
+| `domainFrequency` | `800/800,800/800,800/787,800/800` | MHz |
+| `domainHashrate` | `376/376,374/374` | GH/s |
+
+On Bonanza (BZM) a domain is one of the chip's two engine stacks: its voltage
+is the stack's CH0 or CH1 telemetry rail and its frequency the stack's PLL.
+Temperatures and rails come from telemetry no older than two seconds. BZM
+counts hashrate per chip, so it does not send `domainHashrate`; families with
+more than one hash-counting domain send it only when it cannot be confused
+with the rail and clock domains.
+
+### Setup network name for bonanzaDisplay's WiFi setup screen
+
+In AP mode the host refuses requests and subscriptions, so it pushes the name
+of its setup network with every `ap_mode` message:
+
+```
+$BAP,CMD,mode,ap_mode*HH
+$BAP,RES,apSsid,Bitaxe_A1B2*HH
+```
+
+The name is `Bitaxe_` and the last two bytes of the access point's MAC
+address in hex, the same name the host's own screen puts in its QR code. The
+access point starts at every boot and stops once WiFi connects, so both
+messages are also sent for the first few seconds of a normal start; clients
+should wait a little before showing a setup screen. `apSsid` is sent only
+while the access point is up (`apEnabled` in the web API), so not after it is
+switched off by hand. The network is open and its setup page is at
+`192.168.4.1`. A client should not treat this `RES` as the host being
+connected.

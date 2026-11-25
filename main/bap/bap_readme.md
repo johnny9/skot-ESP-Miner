@@ -229,3 +229,27 @@ UART settings:
 - Use a serial terminal to manually send commands
 - Monitor UART buffer status for overflow conditions
 - Check mutex acquisition failures in logs
+
+## Bonanza 1004 serial display
+
+Bonanza 1004 enables the existing BAP host on UART2 at 115200 baud, 8N1,
+using ESP32 TX GPIO39 and RX GPIO40. The ASIC bridge uses UART1 on GPIO17/18.
+Set `CONFIG_ENABLE_BAP=n` to disable the accessory, or use the existing BAP
+GPIO overrides to select other pins. Keep the local LVGL display set to `NONE`;
+the serial accessory runs its own display firmware.
+
+The display can use the existing identity request and telemetry subscriptions.
+The identity response keeps its existing replies and appends actual ASIC
+frequency in MHz; clients that do not use that property can ignore it.
+One-shot requests also support frequency, hashrate, temperature, power, fan RPM,
+best difficulty and WiFi IP through the existing parameter names. These reads
+return the same values and units as the corresponding subscription updates
+without activating a subscription.
+To receive actual ASIC frequency in MHz without polling, subscribe with
+`$BAP,SUB,frequency,1000*5E\r\n`. The host sends a `RES,frequency` snapshot
+on the next eligible update and pushes changed values at the requested interval,
+serviced by the existing one-second subscription task. Renew the subscription
+before its five-minute expiry; renewal also sends a fresh snapshot. Send
+`$BAP,UNSUB,frequency*68\r\n` to stop updates. Previously supported requests
+and subscriptions retain their behavior, and the existing parser, checksum
+acceptance and interval handling remain unchanged.

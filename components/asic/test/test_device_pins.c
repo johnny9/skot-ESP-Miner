@@ -26,6 +26,9 @@ TEST_CASE("Bonanza 1004 supplies its control pin map through device configuratio
     }
     TEST_ASSERT_EQUAL_PTR(&BONANZA_1004_CONTROL_PINS, config.pins.bzm);
     TEST_ASSERT_EQUAL_PTR(&BONANZA_1004_UART_PINS, config.pins.asic_uart);
+    TEST_ASSERT_EQUAL_PTR(&DEFAULT_BAP_PINS, config.pins.bap);
+    TEST_ASSERT_EQUAL(GPIO_NUM_39, config.pins.bap->tx);
+    TEST_ASSERT_EQUAL(GPIO_NUM_40, config.pins.bap->rx);
     TEST_ASSERT_EQUAL_PTR(&BONANZA_FAN_DRIVER, config.fan_driver);
     TEST_ASSERT_EQUAL_PTR(&BONANZA_VCORE_DRIVER, config.vcore_driver);
     TEST_ASSERT_EQUAL(GPIO_NUM_17, config.pins.asic_uart->tx);

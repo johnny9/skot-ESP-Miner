@@ -237,6 +237,45 @@ void BAP_send_request(bap_parameter_t param, GlobalState *state) {
             BAP_send_message(BAP_CMD_RES, "pool", state->SYSTEM_MODULE.pools[prim_idx].url);
             BAP_send_message(BAP_CMD_RES, "poolPort", port_str);
             BAP_send_message(BAP_CMD_RES, "poolUser", state->SYSTEM_MODULE.pools[prim_idx].user);
+            BAP_send_request(BAP_PARAM_FREQUENCY, state);
+            break;
+        case BAP_PARAM_FREQUENCY: {
+            char number[32];
+            snprintf(number, sizeof(number), "%.2f", state->POWER_MANAGEMENT_MODULE.actual_frequency);
+            BAP_send_message(BAP_CMD_RES, "frequency", number);
+            break;
+        }
+        case BAP_PARAM_HASHRATE: {
+            char number[32];
+            snprintf(number, sizeof(number), "%.2f", state->SYSTEM_MODULE.current_hashrate);
+            BAP_send_message(BAP_CMD_RES, "hashrate", number);
+            break;
+        }
+        case BAP_PARAM_TEMPERATURE: {
+            char number[32];
+            snprintf(number, sizeof(number), "%f", state->POWER_MANAGEMENT_MODULE.chip_temp_avg);
+            BAP_send_message(BAP_CMD_RES, "chipTemp", number);
+            snprintf(number, sizeof(number), "%f", state->POWER_MANAGEMENT_MODULE.vr_temp);
+            BAP_send_message(BAP_CMD_RES, "vrTemp", number);
+            break;
+        }
+        case BAP_PARAM_POWER: {
+            char number[32];
+            snprintf(number, sizeof(number), "%.2f", state->POWER_MANAGEMENT_MODULE.power);
+            BAP_send_message(BAP_CMD_RES, "power", number);
+            break;
+        }
+        case BAP_PARAM_FAN_SPEED: {
+            char number[32];
+            snprintf(number, sizeof(number), "%u", state->POWER_MANAGEMENT_MODULE.fan_rpm);
+            BAP_send_message(BAP_CMD_RES, "fan_speed", number);
+            break;
+        }
+        case BAP_PARAM_BEST_DIFFICULTY:
+            BAP_send_message(BAP_CMD_RES, "best_difficulty", state->SYSTEM_MODULE.best_diff_string);
+            break;
+        case BAP_PARAM_WIFI:
+            BAP_send_message(BAP_CMD_RES, "wifi_ip", state->SYSTEM_MODULE.ip_addr_str);
             break;
         case BAP_PARAM_SHARES:
             {
